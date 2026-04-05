@@ -942,51 +942,58 @@ async function sincronizar(){
   btn.disabled = true;
 
   try {
+    let subioExitoso = false;
+    let tsSubida = null;
+
     // 1. Subir pendientes primero
     if(_pendiente.length > 0 && _data){
       _aplicarPendientes();
+      // Marcar timestamp ANTES de subir: Drive y local quedan con el mismo ts
+      tsSubida = new Date().toISOString();
+      const payload = Object.assign({}, _data, { _guardado: tsSubida, _version: 2 });
       const res = await fetch(_gasUrl, {
         method: 'POST',
-        body: JSON.stringify({ action: 'save', data: _data })
+        body: JSON.stringify({ action: 'save', data: payload })
       });
       const r = await res.json();
       if(r.ok || r.status === 'ok'){
+        _data      = payload;  // fuente de verdad = lo que acabamos de subir
         _pendiente = [];
+        _lastSync  = tsSubida;
         await _guardarCacheIDB();
+        subioExitoso = true;
         toast('☁ Cambios subidos ✓');
+      } else {
+        throw new Error('Error al guardar en Drive');
       }
     }
-    // 2. Bajar datos de Drive
-    const res = await fetch(_gasUrl + '?action=load&t=' + Date.now());
-    const r   = await res.json();
-    if(r.data){
-      const driveData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-      const tsLocal   = _data?._guardado || null;
-      const tsDrive   = driveData._guardado || null;
-      if(tsLocal && tsDrive && tsLocal !== tsDrive){
-        const masNuevo = new Date(tsDrive) > new Date(tsLocal) ? 'Drive' : 'local';
-        const msg = masNuevo === 'Drive'
-          ? `La nube tiene datos más recientes (${new Date(tsDrive).toLocaleString('es')}).
-¿Descargar y reemplazar datos locales?`
-          : `Los datos locales son más recientes (${new Date(tsLocal).toLocaleString('es')}).
-¿Descargar igualmente desde Drive?`;
-        if(!confirm(msg)){
-          btn.querySelector('.sync-icon').style.animation = '';
-          label.textContent = 'Sincronizar';
-          btn.disabled = false;
-          _actualizarSyncStatus(true);
-          return;
+
+    // 2. Bajar datos de Drive solo si NO acabamos de subir
+    //    (GAS puede devolver caché vieja justo después de un POST)
+    if(!subioExitoso){
+      const res = await fetch(_gasUrl + '?action=load&t=' + Date.now());
+      const r   = await res.json();
+      if(r.data){
+        const driveData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+        const tsLocal   = _data?._guardado || null;
+        const tsDrive   = driveData._guardado || null;
+        // Solo reemplazar si Drive tiene datos más nuevos o no hay datos locales
+        if(!tsLocal || (tsDrive && new Date(tsDrive) > new Date(tsLocal))){
+          _data     = driveData;
+          _lastSync = new Date().toISOString();
+          await _guardarCacheIDB();
+          irA(_seccion);
+          toast('✓ Datos actualizados desde Drive');
+        } else {
+          toast('✓ Ya tenés los datos más recientes');
         }
+      } else if(!_data){
+        throw new Error('Sin datos en Drive');
       }
-      _data     = driveData;
-      _lastSync = new Date().toISOString();
-      await _guardarCacheIDB();
-      _actualizarSyncStatus(true);
-      irA(_seccion);
-      toast('✓ Datos actualizados');
-    } else {
-      throw new Error('Sin datos en Drive');
     }
+
+    _actualizarSyncStatus(true);
+    irA(_seccion);
   } catch(e){
     console.error(e);
     _actualizarSyncStatus(false);
@@ -1077,9 +1084,14 @@ function _aplicarPendientes(){
       if(p){
         p.estado = op.estado;
         if(op.ventaIds) p.ventaIds = op.ventaIds;
+        if(op.fechaEntregaReal) p.fechaEntregaReal = op.fechaEntregaReal;
+        if(op.fechaCobro) p.fechaCobro = op.fechaCobro;
         if(op.estado === 'entregado' && op.ventas){
           if(!_data.ventas) _data.ventas = [];
-          op.ventas.forEach(v => _data.ventas.push(v));
+          op.ventas.forEach(v => {
+            // Evitar duplicados
+            if(!_data.ventas.find(ev => ev.id === v.id)) _data.ventas.push(v);
+          });
         }
       }
     }
