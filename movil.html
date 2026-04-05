@@ -729,6 +729,42 @@ body {
 
 <script>
 // ══════════════════════════════════════════════
+//  FORMATTERS
+// ══════════════════════════════════════════════
+const fmt = n => isNaN(n) ? '—' : '$' + Number(n).toFixed(2);
+const fmtN = (n,d=2) => isNaN(n) ? '—' : Number(n).toFixed(d);
+const today = () => new Date().toISOString().split('T')[0];
+
+function toast(msg, ms=2500){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ══════════════════════════════════════════════
+//  NAVEGACIÓN
+// ══════════════════════════════════════════════
+let _seccion = 'inicio';
+
+function irA(sec){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + (sec === 'stock' ? 'stock' : sec)).classList.add('active');
+  const tabId = sec === 'stock' ? 'tab-compras' : 'tab-' + sec;
+  const tabEl = document.getElementById(tabId);
+  if(tabEl) tabEl.classList.add('active');
+  _seccion = sec;
+  document.getElementById('content').scrollTop = 0;
+  if(sec === 'inicio')   renderInicio();
+  if(sec === 'ventas')   renderVentasMovil();
+  if(sec === 'pedidos')  renderPedidosMovil();
+  if(sec === 'compras')  renderComprasMovil();
+  if(sec === 'stock')    renderStockMovil();
+}
+
+// ══════════════════════════════════════════════
 //  DATOS LOCALES
 // ══════════════════════════════════════════════
 let _data = null;       // datos completos (caché local)
