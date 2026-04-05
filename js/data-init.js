@@ -16,137 +16,105 @@ function formatCantidad(stock, unidad){
   return `${fmtN(stock, 3)} ${unidad}`;
 }
 
-function initializeData(){
+async function initializeData(){
   const DEF={
-    ingredientes:[],
-    recetas:[],
-    producciones:[],
-    ventas:[],
-    pedidos:[],
-    stockProductos:[],
-    proveedores:[],
-    historialCompras:[],
-    extracciones:[],
+    ingredientes:[],recetas:[],producciones:[],ventas:[],pedidos:[],
+    stockProductos:[],proveedores:[],historialCompras:[],extracciones:[],
     nextId:{ing:1,rec:1,prod:1,venta:1,prov:1,comp:1,pedido:1,ext:1}
   };
-  
-  // Si hay archivo vinculado, no cargar desde localStorage (los datos ya se cargaron desde el archivo)
-  if(_fileHandle){
-    console.log('Usando datos desde archivo vinculado, omitiendo localStorage');
-    return;
-  }
-  
+
+  // Si hay archivo vinculado, datos ya cargados desde el archivo
+  if(_fileHandle){ console.log('Usando datos desde archivo vinculado, omitiendo IDB'); return; }
+
   try{
-    // Primero intentar cargar datos del sistema nuevo
-    let saved=localStorage.getItem('reposteria_data');
+    const db = await abrirDB();
+    let saved = await dbGet(db, 'reposteria_data');
+
+    // ── Migración única localStorage → IndexedDB ──
     if(!saved){
-      // Si no hay datos nuevos, intentar recuperar del sistema viejo
-      const oldData=localStorage.getItem('dulcemasa_v3');
-      if(oldData){
-        console.log('Recuperando datos del sistema anterior...');
-        const data=JSON.parse(oldData);
-        ingredientes=data.ingredientes||DEF.ingredientes;
-        recetas=data.recetas||DEF.recetas;
-        producciones=data.producciones||DEF.producciones;
-        ventas=data.ventas||DEF.ventas;
-        pedidos=[]; // Los pedidos son nuevos, no existen en el sistema viejo
-        stockProductos=data.stockProductos||DEF.stockProductos;
-        proveedores=data.proveedores||DEF.proveedores;
-        historialCompras=data.historialCompras||DEF.historialCompras;
-        nextId=data.nextId||DEF.nextId;
-        
-        // Guardar automáticamente en el nuevo sistema
-        const newData={
-          ingredientes,recetas,producciones,ventas,pedidos,stockProductos,proveedores,historialCompras,nextId
+      const lsNew = localStorage.getItem('reposteria_data');
+      const lsOld = localStorage.getItem('dulcemasa_v3');
+      if(lsNew){
+        console.log('Migrando datos de localStorage → IndexedDB...');
+        saved = JSON.parse(lsNew);
+        await dbSet(db, 'reposteria_data', saved);
+        localStorage.removeItem('reposteria_data');
+        console.log('Migración completa.');
+      } else if(lsOld){
+        console.log('Migrando sistema antiguo → IndexedDB...');
+        const data = JSON.parse(lsOld);
+        saved = {
+          ingredientes:data.ingredientes||DEF.ingredientes,
+          recetas:data.recetas||DEF.recetas,
+          producciones:data.producciones||DEF.producciones,
+          ventas:data.ventas||DEF.ventas,
+          pedidos:DEF.pedidos,
+          stockProductos:data.stockProductos||DEF.stockProductos,
+          proveedores:data.proveedores||DEF.proveedores,
+          historialCompras:data.historialCompras||DEF.historialCompras,
+          nextId:data.nextId||DEF.nextId
         };
-        localStorage.setItem('reposteria_data',JSON.stringify(newData));
-        console.log('Datos migrados al nuevo sistema');
-        return;
+        await dbSet(db, 'reposteria_data', saved);
+        localStorage.removeItem('dulcemasa_v3');
+        console.log('Migración desde sistema antiguo completa.');
       }
     }
-    
+
     if(saved){
-      const data=JSON.parse(saved);
-      ingredientes=data.ingredientes||DEF.ingredientes;
-      recetas=data.recetas||DEF.recetas;
-      producciones=data.producciones||DEF.producciones;
-      ventas=data.ventas||DEF.ventas;
-      pedidos=data.pedidos||DEF.pedidos;
-      stockProductos=data.stockProductos||DEF.stockProductos;
-      proveedores=data.proveedores||DEF.proveedores;
-      historialCompras=data.historialCompras||DEF.historialCompras;
-      nextId=data.nextId||DEF.nextId;
-      if(data.catRecetas && Array.isArray(data.catRecetas) && data.catRecetas.length > 0)
-        catRecetas = data.catRecetas;
-      if(data.gastosFijos && Array.isArray(data.gastosFijos))
-        gastosFijos = data.gastosFijos;
-      if(data.extracciones && Array.isArray(data.extracciones))
-        extracciones = data.extracciones;
-      if(data.prestamos && Array.isArray(data.prestamos))
-        prestamos = data.prestamos;
-    }else{
-      ingredientes=DEF.ingredientes;
-      recetas=DEF.recetas;
-      producciones=DEF.producciones;
-      ventas=DEF.ventas;
-      pedidos=DEF.pedidos;
-      stockProductos=DEF.stockProductos;
-      proveedores=DEF.proveedores;
-      historialCompras=DEF.historialCompras;
-      nextId=DEF.nextId;
+      ingredientes    = saved.ingredientes    ||DEF.ingredientes;
+      recetas         = saved.recetas         ||DEF.recetas;
+      producciones    = saved.producciones    ||DEF.producciones;
+      ventas          = saved.ventas          ||DEF.ventas;
+      pedidos         = saved.pedidos         ||DEF.pedidos;
+      stockProductos  = saved.stockProductos  ||DEF.stockProductos;
+      proveedores     = saved.proveedores     ||DEF.proveedores;
+      historialCompras= saved.historialCompras||DEF.historialCompras;
+      nextId          = saved.nextId          ||DEF.nextId;
+      if(saved.catRecetas&&Array.isArray(saved.catRecetas)&&saved.catRecetas.length>0) catRecetas=saved.catRecetas;
+      if(saved.gastosFijos&&Array.isArray(saved.gastosFijos))   gastosFijos=saved.gastosFijos;
+      if(saved.extracciones&&Array.isArray(saved.extracciones)) extracciones=saved.extracciones;
+      if(saved.prestamos&&Array.isArray(saved.prestamos))       prestamos=saved.prestamos;
+    } else {
+      ingredientes=DEF.ingredientes; recetas=DEF.recetas; producciones=DEF.producciones;
+      ventas=DEF.ventas; pedidos=DEF.pedidos; stockProductos=DEF.stockProductos;
+      proveedores=DEF.proveedores; historialCompras=DEF.historialCompras; nextId=DEF.nextId;
     }
   }catch(e){
-    // Si hay error, usar valores por defecto
-    console.error('Error cargando datos desde localStorage:', e);
-    ingredientes=DEF.ingredientes;
-    recetas=DEF.recetas;
-    producciones=DEF.producciones;
-    ventas=DEF.ventas;
-    pedidos=DEF.pedidos;
-    stockProductos=DEF.stockProductos;
-    proveedores=DEF.proveedores;
-    historialCompras=DEF.historialCompras;
-    nextId=DEF.nextId;
+    console.error('Error cargando datos desde IndexedDB:', e);
+    ingredientes=DEF.ingredientes; recetas=DEF.recetas; producciones=DEF.producciones;
+    ventas=DEF.ventas; pedidos=DEF.pedidos; stockProductos=DEF.stockProductos;
+    proveedores=DEF.proveedores; historialCompras=DEF.historialCompras; nextId=DEF.nextId;
   }
-  
-  // Asegurar que nextId tenga todas las propiedades necesarias
-  if(!nextId)nextId={};
-  nextId.ing=nextId.ing||1;
-  nextId.rec=nextId.rec||1;
-  nextId.prod=nextId.prod||1;
-  nextId.venta=nextId.venta||1;
-  nextId.comp=nextId.comp||nextId.compra||1;
-  nextId.prov=nextId.prov||1;
-  nextId.pedido=nextId.pedido||pedidos?.length+1||1;
-  nextId.ext=nextId.ext||1;
+
+  // ── Asegurar nextId completo ──
+  if(!nextId) nextId={};
+  nextId.ing    = nextId.ing    ||1;
+  nextId.rec    = nextId.rec    ||1;
+  nextId.prod   = nextId.prod   ||1;
+  nextId.venta  = nextId.venta  ||1;
+  nextId.comp   = nextId.comp   ||nextId.compra||1;
+  nextId.prov   = nextId.prov   ||1;
+  nextId.pedido = nextId.pedido ||pedidos?.length+1||1;
+  nextId.ext    = nextId.ext    ||1;
   nextId.prestamo=nextId.prestamo||1;
 
-  // Sanear ids inválidos en historialCompras (null/NaN causados por bug nextId.comp vs nextId.compra)
-  let _maxCompId = 0;
-  let _idsSaneados = 0;
-  (historialCompras||[]).forEach(c => {
-    const idNum = Number(c.id);
-    if(!isNaN(idNum) && idNum > 0) _maxCompId = Math.max(_maxCompId, idNum);
+  // ── Sanear ids inválidos en historialCompras ──
+  let _maxCompId=0, _idsSaneados=0;
+  (historialCompras||[]).forEach(c=>{const n=Number(c.id);if(!isNaN(n)&&n>0)_maxCompId=Math.max(_maxCompId,n);});
+  (historialCompras||[]).forEach(c=>{
+    const n=Number(c.id);
+    if(c.id===undefined||c.id===null||isNaN(n)||n<=0){c.id=++_maxCompId;_idsSaneados++;}
+    else c.id=n;
   });
-  (historialCompras||[]).forEach(c => {
-    const idNum = Number(c.id);
-    if(c.id === undefined || c.id === null || isNaN(idNum) || idNum <= 0) {
-      c.id = ++_maxCompId;
-      _idsSaneados++;
-    } else {
-      c.id = idNum; // normalizar a número
-    }
-  });
-  nextId.comp = Math.max(nextId.comp, _maxCompId + 1);
+  nextId.comp=Math.max(nextId.comp,_maxCompId+1);
 
-  // Inicializar la UI después de cargar los datos
   initApp();
-  // Si se sanearon ids, persistir de inmediato para que el fix sobreviva recargas
-  if(_idsSaneados > 0){
+  if(_idsSaneados>0){
     console.warn(`[DulceMasa] Se sanearon ${_idsSaneados} id(s) en historialCompras`);
     saveData();
   }
 }
+
 // initializeData() se llamará después de cargar el handle del archivo
 
 function initApp(){
@@ -163,7 +131,7 @@ function borrarTodosLosDatos(){
     mensaje: 'Esto eliminará <strong>ingredientes, recetas, producciones, ventas, pedidos, proveedores e historial</strong>. Esta acción no se puede deshacer.',
     labelOk: 'Sí, borrar todo',
     tipo: 'danger',
-    onOk: () => { localStorage.removeItem("reposteria_data"); localStorage.removeItem("dulcemasa_v3"); location.reload(); }
+    onOk: async () => { try{ const db=await abrirDB(); await dbDel(db,'reposteria_data'); }catch(e){} localStorage.removeItem('reposteria_data'); localStorage.removeItem('dulcemasa_v3'); location.reload(); }
   });
 }
 

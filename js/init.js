@@ -23,7 +23,7 @@ inicializarStockProductos();
 (async function cargarHandleGuardado(){
   try{
     if(!('indexedDB' in window)){
-      initializeData(); // Si no hay IndexedDB, inicializar desde localStorage
+      await initializeData(); // Si no hay IndexedDB, inicializar desde localStorage
       return;
     }
     const db = await abrirDB();
@@ -46,24 +46,24 @@ inicializarStockProductos();
         }catch(e){
           console.error('Error cargando desde archivo vinculado:', e);
           toast('⚠ Error al cargar desde archivo vinculado');
-          initializeData(); // Cargar desde localStorage si hay error
+          await initializeData(); // Cargar desde localStorage si hay error
         }
       } else {
         // Permiso caducado — requiere interacción del usuario para solicitar permisos
         console.log('Permisos expirados, se requiere clic del usuario para:', h.name);
         _fileHandle = h;
         actualizarUIArchivo(h.name, false, 'Click para restaurar permisos');
-        initializeData(); // Cargar desde localStorage mientras se espera acción del usuario
+        await initializeData(); // Cargar desde localStorage mientras se espera acción del usuario
       }
     } else {
       // No hay archivo vinculado, cargar desde localStorage
-      initializeData();
+      await initializeData();
       // Comparar con Drive al arrancar
       if(_gasUrl) _gdriveCompararAlArrancar();
     }
   }catch(e){ 
     console.warn('No se pudo restaurar handle:',e);
-    initializeData(); // Cargar desde localStorage si hay error
+    await initializeData(); // Cargar desde localStorage si hay error
   }
 })();
 
@@ -130,21 +130,11 @@ async function saveData(){
     await _escribirArchivo(false); // _escribirArchivo ya genera su propio JSON
   } else {
     try {
-      const json = JSON.stringify(data, null, 2);
-      localStorage.setItem('reposteria_data', json);
-      // Advertir si el almacenamiento supera el 80% del límite típico (5MB)
-      const usadoKB = Math.round(json.length / 1024);
-      if(usadoKB > 4000) {
-        console.warn(`[DulceMasa] localStorage usando ${usadoKB}KB — cerca del límite de 5MB`);
-        toast('⚠ Almacenamiento casi lleno. Vinculá un archivo JSON para no perder datos.', 5000);
-      }
+      const db = await abrirDB();
+      await dbSet(db, 'reposteria_data', data);
     } catch(e) {
-      console.error('[DulceMasa] Error al guardar en localStorage:', e);
-      if(e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-        toast('❌ Sin espacio de almacenamiento. Vinculá un archivo JSON urgente (📁 Vincular).', 7000);
-      } else {
-        toast('⚠ No se pudo guardar localmente. Revisá la consola del navegador.');
-      }
+      console.error('[DulceMasa] Error al guardar en IndexedDB:', e);
+      toast('⚠ No se pudo guardar localmente. Revisá la consola del navegador.');
     }
   }
   
@@ -337,7 +327,7 @@ async function restaurarPermiso(){
       }catch(e){
         console.error('Error cargando desde archivo vinculado:', e);
         toast('⚠ Error al cargar desde archivo vinculado');
-        initializeData();
+        await initializeData();
       }
     } else {
       actualizarUIArchivo(_fileHandle.name, false, 'Permiso denegado');

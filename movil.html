@@ -526,6 +526,10 @@ body {
     <span class="sync-icon">⟳</span>
     <span id="sync-label">Sincronizar</span>
   </button>
+  <button class="sync-btn" onclick="subirADrive()" id="btn-subir" style="background:var(--caramel);margin-left:8px">
+    <span>☁</span>
+    <span>Subir a Drive</span>
+  </button>
 </div>
 
 <!-- CONTENT -->
@@ -723,44 +727,49 @@ body {
 // ══════════════════════════════════════════════
 //  DATOS LOCALES
 // ══════════════════════════════════════════════
-let _data = null; // datos completos del servidor
+let _data = null;       // datos completos (caché local)
 let _gasUrl = localStorage.getItem('movil_gas_url') || '';
-let _pendiente = JSON.parse(localStorage.getItem('movil_pendiente') || '[]'); // cambios sin sync
-let _lastSync = localStorage.getItem('movil_last_sync') || null;
+let _pendiente = [];    // cambios sin subir a Drive
+let _lastSync  = null;  // timestamp último sync exitoso
 
-// ── Formatters ──
-const fmt = n => isNaN(n) ? '—' : '$' + Number(n).toFixed(2);
-const fmtN = (n,d=2) => isNaN(n) ? '—' : Number(n).toFixed(d);
-const today = () => new Date().toISOString().split('T')[0];
+// ══════════════════════════════════════════════
+//  INDEXEDDB — almacenamiento principal
+// ══════════════════════════════════════════════
+const IDB_NAME  = 'dulcemasa_movil';
+const IDB_STORE = 'store';
 
-function toast(msg, ms=2500){
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), ms);
+function _abrirDB(){
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+function _idbSet(db, key, val){
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => res();
+    tx.onerror    = e => rej(e.target.error);
+  });
+}
+function _idbGet(db, key){
+  return new Promise((res, rej) => {
+    const tx  = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
 }
 
-// ══════════════════════════════════════════════
-//  NAVEGACIÓN
-// ══════════════════════════════════════════════
-let _seccion = 'inicio';
-
-function irA(sec){
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('screen-' + (sec === 'stock' ? 'stock' : sec)).classList.add('active');
-  const tabId = sec === 'stock' ? 'tab-compras' : 'tab-' + sec;
-  const tabEl = document.getElementById(tabId);
-  if(tabEl) tabEl.classList.add('active');
-  _seccion = sec;
-  document.getElementById('content').scrollTop = 0;
-  // Renderizar según sección
-  if(sec === 'inicio') renderInicio();
-  if(sec === 'ventas') renderVentasMovil();
-  if(sec === 'pedidos') renderPedidosMovil();
-  if(sec === 'compras') renderComprasMovil();
-  if(sec === 'stock') renderStockMovil();
+async function _guardarCacheIDB(){
+  try {
+    const db = await _abrirDB();
+    await _idbSet(db, 'movil_cache',     _data);
+    await _idbSet(db, 'movil_pendiente', _pendiente);
+    await _idbSet(db, 'movil_last_sync', _lastSync);
+  } catch(e){ console.error('[Movil] Error guardando IDB:', e); }
 }
 
 // ══════════════════════════════════════════════
@@ -773,15 +782,14 @@ async function sincronizar(){
     _gasUrl = _gasUrl.trim();
     localStorage.setItem('movil_gas_url', _gasUrl);
   }
-
-  const btn = document.getElementById('sync-btn');
+  const btn   = document.getElementById('sync-btn');
   const label = document.getElementById('sync-label');
   btn.querySelector('.sync-icon').style.animation = 'spin .8s linear infinite';
   label.textContent = 'Sincronizando…';
   btn.disabled = true;
 
   try {
-    // 1. Subir cambios pendientes primero
+    // 1. Subir pendientes primero
     if(_pendiente.length > 0 && _data){
       _aplicarPendientes();
       const res = await fetch(_gasUrl, {
@@ -791,60 +799,99 @@ async function sincronizar(){
       const r = await res.json();
       if(r.ok || r.status === 'ok'){
         _pendiente = [];
-        localStorage.setItem('movil_pendiente', '[]');
+        await _guardarCacheIDB();
         toast('☁ Cambios subidos ✓');
       }
     }
-
-    // 2. Bajar datos actualizados
+    // 2. Bajar datos de Drive
     const res = await fetch(_gasUrl + '?action=load&t=' + Date.now());
-    const r = await res.json();
+    const r   = await res.json();
     if(r.data){
-      _data = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+      const driveData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+      const tsLocal   = _data?._guardado || null;
+      const tsDrive   = driveData._guardado || null;
+      if(tsLocal && tsDrive && tsLocal !== tsDrive){
+        const masNuevo = new Date(tsDrive) > new Date(tsLocal) ? 'Drive' : 'local';
+        const msg = masNuevo === 'Drive'
+          ? `La nube tiene datos más recientes (${new Date(tsDrive).toLocaleString('es')}).
+¿Descargar y reemplazar datos locales?`
+          : `Los datos locales son más recientes (${new Date(tsLocal).toLocaleString('es')}).
+¿Descargar igualmente desde Drive?`;
+        if(!confirm(msg)){
+          btn.querySelector('.sync-icon').style.animation = '';
+          label.textContent = 'Sincronizar';
+          btn.disabled = false;
+          _actualizarSyncStatus(true);
+          return;
+        }
+      }
+      _data     = driveData;
       _lastSync = new Date().toISOString();
-      localStorage.setItem('movil_last_sync', _lastSync);
-      localStorage.setItem('movil_cache', JSON.stringify(_data));
+      await _guardarCacheIDB();
       _actualizarSyncStatus(true);
-      irA(_seccion); // refrescar vista actual
+      irA(_seccion);
       toast('✓ Datos actualizados');
     } else {
       throw new Error('Sin datos en Drive');
     }
-  } catch(e) {
+  } catch(e){
     console.error(e);
     _actualizarSyncStatus(false);
     toast('⚠ Error de sincronización: ' + e.message, 4000);
   }
-
   btn.querySelector('.sync-icon').style.animation = '';
   label.textContent = 'Sincronizar';
   btn.disabled = false;
 }
 
-function _actualizarSyncStatus(ok){
-  const dot = document.getElementById('sync-dot');
-  const text = document.getElementById('sync-status-text');
-  if(ok && _lastSync){
-    const d = new Date(_lastSync);
-    const diff = Math.round((Date.now() - d) / 60000);
-    dot.className = 'sync-dot ok';
-    text.textContent = `Sincronizado ${diff < 1 ? 'ahora mismo' : 'hace ' + diff + ' min'}`;
-  } else if(_pendiente.length > 0){
-    dot.className = 'sync-dot warn';
-    text.textContent = `${_pendiente.length} cambio(s) pendiente(s) de subir`;
-  } else {
-    dot.className = 'sync-dot';
-    text.textContent = _gasUrl ? 'Sin sincronizar · Tocá "Sincronizar"' : 'Configurá la URL de Drive';
+// Subida manual explícita a Drive
+async function subirADrive(){
+  if(!_gasUrl){ toast('⚠ Configurá la URL de Drive primero'); return; }
+  if(!_data)  { toast('⚠ Sin datos para subir'); return; }
+  const btn = document.getElementById('btn-subir');
+  if(btn){ btn.disabled = true; btn.textContent = 'Subiendo…'; }
+  try {
+    _aplicarPendientes();
+    const payload = Object.assign({}, _data, {
+      _version:  2,
+      _guardado: new Date().toISOString()
+    });
+    const res = await fetch(_gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'save', data: payload })
+    });
+    const r = await res.json();
+    if(r.ok || r.status === 'ok'){
+      _data      = payload;
+      _pendiente = [];
+      _lastSync  = payload._guardado;
+      await _guardarCacheIDB();
+      _actualizarSyncStatus(true);
+      toast('☁ Subido a Drive ✓');
+    } else {
+      throw new Error('Respuesta inválida del servidor');
+    }
+  } catch(e){
+    console.error(e);
+    toast('⚠ Error al subir: ' + e.message, 4000);
   }
+  if(btn){ btn.disabled = false; btn.textContent = '☁ Subir a Drive'; }
 }
 
-// Cargar caché local al iniciar
-function _cargarCache(){
-  const cache = localStorage.getItem('movil_cache');
-  if(cache){
-    try { _data = JSON.parse(cache); } catch(e){}
+function _actualizarSyncStatus(ok){
+  const dot  = document.getElementById('sync-dot');
+  const text = document.getElementById('sync-status-text');
+  if(ok && _lastSync){
+    const diff = Math.round((Date.now() - new Date(_lastSync)) / 60000);
+    dot.className    = 'sync-dot ok';
+    text.textContent = `Sincronizado ${diff < 1 ? 'ahora mismo' : 'hace ' + diff + ' min'}`;
+  } else if(_pendiente.length > 0){
+    dot.className    = 'sync-dot warn';
+    text.textContent = `${_pendiente.length} cambio(s) pendiente(s) de subir`;
+  } else {
+    dot.className    = 'sync-dot';
+    text.textContent = _gasUrl ? 'Sin sincronizar · Tocá "Sincronizar"' : 'Configurá la URL de Drive';
   }
-  _actualizarSyncStatus(!!_lastSync);
 }
 
 // ══════════════════════════════════════════════
@@ -880,9 +927,9 @@ function _aplicarPendientes(){
   });
 }
 
-function _guardarPendiente(op){
+async function _guardarPendiente(op){
   _pendiente.push(op);
-  localStorage.setItem('movil_pendiente', JSON.stringify(_pendiente));
+  await _guardarCacheIDB();
   _actualizarSyncStatus(false);
 }
 
@@ -999,7 +1046,7 @@ function calcVenta(){
   }
 }
 
-function registrarVentaMovil(){
+async function registrarVentaMovil(){
   const recetaId = parseInt(document.getElementById('v-prod').value);
   const unidades = parseInt(document.getElementById('v-unidades').value)||0;
   const precio = parseFloat(document.getElementById('v-precio').value)||0;
@@ -1024,10 +1071,10 @@ function registrarVentaMovil(){
     if(!_data.ventas) _data.ventas = [];
     _data.ventas.push(venta);
     if(sp) sp.stock = Math.max(0, sp.stock - unidades);
-    localStorage.setItem('movil_cache', JSON.stringify(_data));
+    await _guardarCacheIDB();
   }
 
-  _guardarPendiente({ type: 'venta', data: venta });
+  await _guardarPendiente({ type: 'venta', data: venta });
 
   // Limpiar formulario
   document.getElementById('v-prod').value = '';
@@ -1148,7 +1195,7 @@ function renderPedidosMovil(){
   }).join('');
 }
 
-function accionPedidoMovil(id, nuevoEstado){
+async function accionPedidoMovil(id, nuevoEstado){
   if(!_data) return;
   const p = (_data.pedidos||[]).find(pe => pe.id == id);
   if(!p) return;
@@ -1188,8 +1235,8 @@ function accionPedidoMovil(id, nuevoEstado){
   }
 
   p.estado = nuevoEstado;
-  localStorage.setItem('movil_cache', JSON.stringify(_data));
-  _guardarPendiente({ type: 'pedido_estado', id, estado: nuevoEstado, ventas: ventasGeneradas });
+  await _guardarCacheIDB();
+  await _guardarPendiente({ type: 'pedido_estado', id, estado: nuevoEstado, ventas: ventasGeneradas });
 
   const msgs = { listo: '✓ Pedido listo — stock descontado', entregado_sin_cobrar: '📦 Entregado — cobro pendiente', entregado: '💰 Cobrado — venta registrada' };
   toast(msgs[nuevoEstado] || 'Actualizado');
@@ -1269,7 +1316,7 @@ function calcCompra(){
   } else { bar.style.display = 'none'; }
 }
 
-function registrarCompraMovil(){
+async function registrarCompraMovil(){
   const ingId = parseInt(document.getElementById('c-ing').value);
   const qty = parseFloat(document.getElementById('c-qty').value)||0;
   const precio = parseFloat(document.getElementById('c-precio').value)||0;
@@ -1289,10 +1336,10 @@ function registrarCompraMovil(){
       ing.stock = +(ing.stock + qty).toFixed(4);
       if(precio > 0) ing.precio = precio;
     }
-    localStorage.setItem('movil_cache', JSON.stringify(_data));
+    await _guardarCacheIDB();
   }
 
-  _guardarPendiente({ type: 'compra', data: compra });
+  await _guardarPendiente({ type: 'compra', data: compra });
 
   document.getElementById('c-ing').value = '';
   document.getElementById('c-qty').value = '';
@@ -1386,14 +1433,76 @@ function filtrarStock(){
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
-_cargarCache();
-renderInicio();
-// Auto-sync si hay cambios pendientes
-if(_pendiente.length > 0 && _gasUrl) {
-  setTimeout(() => sincronizar(), 1500);
+// ══════════════════════════════════════════════
+//  ARRANQUE
+// ══════════════════════════════════════════════
+async function _arrancar(){
+  try {
+    const db = await _abrirDB();
+    // Migración única localStorage → IDB
+    const lsCache = localStorage.getItem('movil_cache');
+    if(lsCache){
+      console.log('[Movil] Migrando caché localStorage → IDB...');
+      try { _data = JSON.parse(lsCache); await _idbSet(db,'movil_cache',_data); } catch(e){}
+      localStorage.removeItem('movil_cache');
+    }
+    const lsPend = localStorage.getItem('movil_pendiente');
+    if(lsPend){
+      try { _pendiente = JSON.parse(lsPend); } catch(e){}
+      localStorage.removeItem('movil_pendiente');
+    }
+    const lsSync = localStorage.getItem('movil_last_sync');
+    if(lsSync){ _lastSync = lsSync; localStorage.removeItem('movil_last_sync'); }
+
+    // Cargar desde IDB si no vino de migración
+    if(!_data){
+      _data      = await _idbGet(db, 'movil_cache')     || null;
+      _pendiente = await _idbGet(db, 'movil_pendiente') || [];
+      _lastSync  = await _idbGet(db, 'movil_last_sync') || null;
+    }
+  } catch(e){ console.error('[Movil] Error IDB arranque:', e); }
+
+  _actualizarSyncStatus(!!_lastSync);
+  renderInicio();
+
+  // Comparar con Drive al abrir
+  if(_gasUrl){
+    setTimeout(async () => {
+      try {
+        const res = await fetch(_gasUrl + '?action=load&t=' + Date.now());
+        const r   = await res.json();
+        if(!r.data) return;
+        const driveData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+        const tsLocal   = _data?._guardado || null;
+        const tsDrive   = driveData._guardado || null;
+        if(tsDrive && tsLocal !== tsDrive){
+          const masNuevo = !tsLocal || new Date(tsDrive) > new Date(tsLocal) ? 'Drive' : 'local';
+          const msg = masNuevo === 'Drive'
+            ? `☁ La nube tiene datos más recientes.
+(${new Date(tsDrive).toLocaleString('es')})
+
+¿Descargar y actualizar datos locales?`
+            : `📱 Los datos locales son más recientes.
+(${new Date(tsLocal).toLocaleString('es')})
+
+¿Descargar igualmente desde Drive?`;
+          if(confirm(msg)){
+            _data     = driveData;
+            _lastSync = new Date().toISOString();
+            await _guardarCacheIDB();
+            _actualizarSyncStatus(true);
+            irA(_seccion);
+            toast('✓ Datos actualizados desde Drive');
+          }
+        }
+      } catch(e){ /* sin conexión, silencioso */ }
+    }, 1200);
+  }
 }
+
 // Actualizar timestamp cada minuto
 setInterval(() => _actualizarSyncStatus(!!_lastSync), 60000);
+_arrancar();
 </script>
 </body>
 </html>
