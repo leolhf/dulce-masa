@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dulce & Masa — Gestión</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#4A3218">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dulce & Masa">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Dulce &amp; Masa</div>
+    <div class="sub">Gestión de repostería</div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">🏠 Operación Principal</div>
+    <div class="nav-item active" onclick="goto('dashboard',this)" data-tooltip="Panel general de control">
+      <span class="icon">⌂</span>
+      <span>Panel Principal</span>
+    </div>
+    <div class="nav-item" id="nav-inv" onclick="goto('inventario',this)" data-tooltip="Gestión de ingredientes y stock">
+      <span class="icon">📦</span>
+      <span>Inventario</span>
+    </div>
+    <div class="nav-item" onclick="goto('recetas',this)" data-tooltip="Catálogo de productos y fórmulas">
+      <span class="icon">📜</span>
+      <span>Recetas</span>
+    </div>
+    <div class="nav-item" onclick="goto('produccion',this)" data-tooltip="Control de fabricación">
+      <span class="icon">🏭</span>
+      <span>Producción</span>
+    </div>
+
+    <div class="nav-section">💰 Ventas y Clientes</div>
+    <div class="nav-item" id="nav-pedidos" onclick="goto('pedidos',this)" data-tooltip="Gestión de pedidos y entregas" data-badge-count="0">
+      <span class="icon">📋</span>
+      <span>Pedidos</span>
+    </div>
+    <div class="nav-item" onclick="goto('ventas',this)" data-tooltip="Registro de ventas diarias">
+      <span class="icon">💳</span>
+      <span>Ventas</span>
+    </div>
+    <div class="nav-item" onclick="goto('proveedores',this)" data-tooltip="Directorio de proveedores">
+      <span class="icon">🏪</span>
+      <span>Proveedores</span>
+    </div>
+    <div class="nav-item" onclick="goto('historial',this)" data-tooltip="Historial de compras">
+      <span class="icon">🧾</span>
+      <span>Compras</span>
+    </div>
+
+    <div class="nav-section">📊 Análisis y Finanzas</div>
+    <!-- <div class="nav-item" onclick="goto('finanzas',this)" data-tooltip="Estadísticas y métricas financieras">
+      <span class="icon">📈</span>
+      <span>Estadísticas</span>
+    </div> -->
+    <div class="nav-item" onclick="goto('costos',this)" data-tooltip="Análisis de costos y rentabilidad">
+      <span class="icon">💰</span>
+      <span>Costos</span>
+    </div>
+    <div class="nav-item" onclick="goto('finanzas',this)" data-tooltip="Control financiero y retiros">
+      <span class="icon">💵</span>
+      <span>Finanzas</span>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+
+    <!-- ── Bloque Archivo Local ── -->
+    <div class="sf-bloque">
+      <div class="sf-bloque-header">
+        <span class="sf-bloque-label">📄 Archivo local</span>
+        <div class="sf-estado-row">
+          <span id="sf-dot" class="sf-dot"></span>
+          <span id="sf-texto" class="sf-estado-txt">Sin archivo</span>
+        </div>
+      </div>
+      <div id="sf-nombre" class="sf-filename" style="display:none"></div>
+      <div id="sf-ts" class="sf-timestamp" style="display:none"></div>
+      <button onclick="guardarAhora()" class="sf-btn sf-btn-save" id="btn-guardar-ahora" style="display:none">💾 Guardar ahora</button>
+      <div class="sf-row">
+        <button onclick="handleBotonVincular()" class="sf-btn-mini sf-btn-mini-pri" id="btn-vincular">📁 Vincular</button>
+        <button onclick="desvincularArchivo()" class="sf-btn-mini sf-btn-mini-ghost" id="btn-desvincular" style="display:none">✕ Desvincular</button>
+      </div>
+      <div class="sf-row" style="margin-top:8px">
+        <button onclick="borrarTodoConfirm()" class="sf-btn-mini sf-btn-mini-danger" id="btn-borrar-todo" style="display:none">🗑️ Borrar todo</button>
+      </div>
+    </div>
+
+    <!-- ── Bloque Google Drive ── -->
+    <div class="sf-bloque">
+      <div class="sf-bloque-header">
+        <span class="sf-bloque-label">☁ Google Drive</span>
+        <div class="sf-estado-row">
+          <span id="gdrive-dot" class="sf-dot"></span>
+          <span id="gdrive-texto" class="sf-estado-txt">Sin configurar</span>
+        </div>
+      </div>
+      <div id="gdrive-archivo-nombre" class="sf-filename" style="display:none"></div>
+      <div id="gdrive-ts" class="sf-timestamp" style="display:none"></div>
+      <div id="gdrive-sync-status" class="sf-sync-status" style="display:none;font-size:.7rem;color:var(--text3);margin:4px 0"></div>
+      <div id="sf-drive-acciones" style="display:none" class="sf-drive-acciones">
+        <button onclick="gdriveSave()" class="sf-btn sf-btn-drive">☁ Guardar en Drive</button>
+        <button onclick="gdriveLoad()" class="sf-btn sf-btn-drive-sec">☁ Cargar desde Drive</button>
+        <button onclick="gdriveSettings()" class="sf-btn sf-btn-mini-blue">⚙ Configuración</button>
+      </div>
+      <div class="sf-row" id="sf-drive-config">
+        <button onclick="handleBotonGDrive()" class="sf-btn-mini sf-btn-mini-blue" id="btn-gdrive-login">🔑 Configurar</button>
+        <button onclick="gdriveLogout()" class="sf-btn-mini sf-btn-mini-ghost" id="btn-gdrive-logout" style="display:none">✕ Salir</button>
+      </div>
+    </div>
+
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menú">
+        <span></span><span></span><span></span>
+      </button>
+      <h1 id="page-title">Panel general</h1>
+    </div>
+    <div class="topbar-right" id="topbar-right">
+      <button id="btn-pwa-install" onclick="pwaInstall()" style="display:none;align-items:center;gap:5px;background:rgba(196,124,43,.15);color:var(--caramel);border:1px solid rgba(196,124,43,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">⬇ Instalar app</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <div class="content">
+
+    <!-- DASHBOARD PROFESIONAL -->
+    <div id="s-dashboard" class="section active">
+      <!-- KPIs Ejecutivos -->
+      <div class="kpi-executive-row" id="kpi-executive-row"></div>
+      
+      <!-- Centro de Control Principal -->
+      <div class="control-center" style="margin-bottom:20px">
+        <div class="control-main">
+          <!-- Alertas Críticas -->
+          <div class="card critical-alerts" style="margin-bottom:16px">
+            <div class="card-header">
+              <span class="card-title">🚨 Centro de Alertas</span>
+              <span class="alert-indicator" id="alert-count"></span>
+            </div>
+            <div class="card-body" id="critical-alerts"></div>
+          </div>
+          
+          <!-- Dashboard Interactivo -->
+          <div class="card dashboard-main">
+            <div class="card-header">
+              <span class="card-title">📊 Panel de Control Operativo</span>
+              <div class="dashboard-controls">
+                <select id="dashboard-period" class="period-selector" onchange="renderMainDashboardChart(parseInt(this.value)||30)">
+                  <option value="7">Últimos 7 días</option>
+                  <option value="30" selected>Últimos 30 días</option>
+                  <option value="90">Últimos 90 días</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="dashboard-grid">
+                <div class="chart-container">
+                  <canvas id="main-performance-chart" height="200"></canvas>
+                </div>
+                <div class="metrics-side">
+                  <div class="metric-item">
+                    <span class="metric-label">Producción vs Ventas</span>
+                    <span class="metric-value" id="production-efficiency">0%</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="metric-label">Tendencia ventas</span>
+                    <span class="metric-trend" id="sales-trend">➜</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="metric-label">Pedidos en proceso</span>
+                    <span class="metric-value" id="active-orders">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Acciones Rápidas -->
+        <div class="quick-actions-sidebar">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚡ Acciones Rápidas</span>
+            </div>
+            <div class="card-body">
+              <button class="quick-action-btn primary" onclick="openNewPedido()">
+                <span class="icon">📋</span>
+                <span>Nuevo Pedido</span>
+              </button>
+              <button class="quick-action-btn secondary" onclick="goto('produccion',this)">
+                <span class="icon">🏭</span>
+                <span>Producción</span>
+              </button>
+              <button class="quick-action-btn secondary" onclick="goto('inventario',this)">
+                <span class="icon">📦</span>
+                <span>Comprar Insumos</span>
+              </button>
+              <button class="quick-action-btn outline" onclick="generateDailyReport()">
+                <span class="icon">📈</span>
+                <span>Ver Reporte</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Estado del Sistema -->
+          <div class="card system-status">
+            <div class="card-header">
+              <span class="card-title">🖥️ Estado del Sistema</span>
+            </div>
+            <div class="card-body">
+              <div class="status-item">
+                <span class="status-dot online"></span>
+                <span class="status-text">Sistema operativo</span>
+              </div>
+              <div class="status-item">
+                <span class="status-dot" id="stock-status"></span>
+                <span class="status-text">Stock estable</span>
+              </div>
+              <div class="status-item">
+                <span class="status-dot" id="orders-status"></span>
+                <span class="status-text">Pedidos al día</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Resumen Operativo Inferior -->
+      <div class="operational-summary">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📈 Resumen Operativo</span>
+          </div>
+          <div class="card-body">
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="summary-label">Ingredientes</span>
+                <span class="summary-value" id="total-ingredients">0</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Recetas activas</span>
+                <span class="summary-value" id="active-recipes">0</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Stock crítico</span>
+                <span class="summary-value critical" id="critical-stock">0</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Eficiencia</span>
+                <span class="summary-value" id="efficiency-rate">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div id="s-inventario" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Ingredientes</span>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input class="search-input" id="inv-q" placeholder="Buscar…" oninput="renderInventario()" style="width:150px">
+            <select class="search-input" id="inv-cat" onchange="renderInventario()" style="width:130px"><option value="">Todas las cat.</option></select>
+            <select class="search-input" id="inv-est" onchange="renderInventario()" style="width:130px">
+              <option value="">Todos</option><option value="ok">OK</option><option value="warn">Por reponer</option><option value="danger">Bajo/Sin stock</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalIng()">+ Agregar</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0"><div class="table-wrap">
+          <table id="tbl-inv"><thead><tr>
+            <th class="th-sort" data-col="nombre" onclick="invSort('nombre')">Ingrediente <span class="sort-icon">↕</span></th>
+            <th class="th-sort" data-col="cat" onclick="invSort('cat')">Categoría <span class="sort-icon">↕</span></th>
+            <th class="th-sort" data-col="stock" onclick="invSort('stock')">Stock <span class="sort-icon">↕</span></th>
+            <th class="th-sort" data-col="min" onclick="invSort('min')">Mínimo <span class="sort-icon">↕</span></th>
+            <th>Unidad</th>
+            <th class="th-sort" data-col="precio" onclick="invSort('precio')">Precio/u <span class="sort-icon">↕</span></th>
+            <th class="th-sort" data-col="estado" onclick="invSort('estado')">Estado <span class="sort-icon">↕</span></th>
+            <th></th>
+          </tr></thead><tbody></tbody></table>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- RECETAS -->
+    <div id="s-recetas" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Recetas</span>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input class="search-input" id="rec-q" placeholder="Buscar…" oninput="renderRecetas()" style="width:150px">
+            <select class="search-input" id="rec-cat-f" onchange="renderRecetas()" style="width:110px"><option value="">Todas</option></select>
+            <select class="search-input" id="rec-disp-f" onchange="renderRecetas()" style="width:130px">
+              <option value="">Disponibilidad</option><option value="ok">Listo</option><option value="nok">Sin stock</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="abrirModalCategorias()" title="Gestionar categorías de recetas">⚙ Categorías</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalReceta()">+ Nueva receta</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0"><div class="table-wrap">
+          <table id="tbl-rec"><thead><tr><th>Producto</th><th>Categoría</th><th>Rinde</th><th>Tiempo</th><th>Costo total</th><th>Costo/unidad</th><th>Disponible</th><th></th></tr></thead><tbody></tbody></table>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- PRODUCCIÓN -->
+    <div id="s-produccion" class="section">
+      <!-- Sugerencias de pedidos pendientes -->
+      <div id="prod-sugerencias" style="display:none;margin-bottom:17px"></div>
+
+      <div class="grid2-70" style="margin-bottom:17px">
+        <div class="card">
+          <div class="card-header"><span class="card-title" id="prod-form-title">Registrar producción</span></div>
+          <div class="card-body">
+            <div class="form-grid" style="margin-bottom:12px">
+              <div class="form-group"><label>Receta</label><select id="prod-rec" onchange="calcProd()"><option value="">— Seleccionar —</option></select></div>
+              <div class="form-group"><label>Tandas</label><input type="number" id="prod-tandas" value="1" min="1" oninput="calcProd()"></div>
+              <div class="form-group"><label>Fecha</label><input type="date" id="prod-fecha"></div>
+              <div class="form-group"><label>Nota</label><input type="text" id="prod-nota" placeholder="Pedido, evento…"></div>
+            </div>
+            <!-- Variaciones de receta -->
+            <div id="prod-variaciones-box" style="display:block;background:var(--cream);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em">🔄 Variaciones de receta</div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="limpiarVariaciones()">✕ Limpiar</button>
+              </div>
+              <div id="prod-variaciones-lista" style="font-size:.76rem;color:var(--text3);margin-bottom:8px">Seleccioná una receta para agregar variaciones</div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalVariaciones()" id="btn-agregar-variacion" disabled>+ Agregar variación</button>
+            </div>
+            <!-- Unidades reales — destacado -->
+            <div id="prod-reales-box" style="background:var(--warn-bg);border:1px solid #E8CCAA;border-radius:var(--r);padding:13px 15px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <div>
+                  <div style="font-size:.78rem;font-weight:600;color:var(--warn);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Unidades reales producidas</div>
+                  <div style="font-size:.76rem;color:var(--text3)" id="prod-reales-hint">Ingresá cuántas unidades salieron realmente del horno. Si no lo registrás, se asume el valor planificado y no se calcula merma.</div>
+                </div>
+                <input type="number" id="prod-reales" value="" min="0" placeholder="—"
+                  oninput="calcProd()"
+                  style="width:80px;font-size:1.2rem;font-weight:700;text-align:center;padding:8px;border:2px solid #E8CCAA;border-radius:var(--r);background:var(--white);font-family:'Playfair Display',serif;color:var(--brown2);outline:none"
+                  onfocus="this.style.borderColor='var(--caramel)'"
+                  onblur="this.style.borderColor='#E8CCAA'">
+              </div>
+            </div>
+            <div id="prod-preview" style="margin-bottom:10px"></div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="registrarProd()">✓ Registrar producción</button>
+              <button class="btn btn-secondary" id="btn-cancelar-prod" onclick="cancelarEdicionProd()" style="display:none;">✕ Cancelar</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recetas con stock</span></div>
+          <div class="card-body" id="prod-disp"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historial de producciones</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="prod-stats" style="font-size:.79rem;color:var(--text3)"></span>
+            <select class="search-input" id="prod-hist-rec" onchange="renderProdTable()" style="width:160px">
+              <option value="">Todas las recetas</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0"><div class="table-wrap">
+          <table id="tbl-prod"><thead><tr><th>Fecha</th><th>Receta</th><th>Tandas</th><th>Planificado</th><th>Real</th><th>Merma</th><th>Costo</th><th>Variaciones</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS -->
+    <div id="s-pedidos" class="section">
+
+      <!-- Alerta 48h -->
+      <div id="pedidos-alerta-48h" style="display:none;margin-bottom:14px"></div>
+
+      <div class="grid2-70">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Registrar pedido</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid" style="margin-bottom:12px">
+              <div class="form-group full"><label>Cliente</label>
+              <div style="position:relative">
+                <input type="text" id="pedido-cliente" placeholder="Nombre del cliente" oninput="mostrarSugerenciasPedidos(this.value)" onfocus="mostrarSugerenciasPedidos(this.value)" onblur="ocultarSugerenciasPedidos()">
+                <div id="sugerencias-pedidos" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:var(--r);max-height:200px;overflow-y:auto;z-index:1000;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.1)"></div>
+              </div>
+            </div>
+              <div class="form-group"><label>Teléfono</label><input type="tel" id="pedido-telefono" placeholder="WhatsApp..."></div>
+              <div class="form-group"><label>Email</label><input type="email" id="pedido-email" placeholder="email@ejemplo.com"></div>
+              <div class="form-group"><label>Fecha entrega</label><input type="date" id="pedido-fecha"></div>
+              <div class="form-group"><label>Anticipo</label><input type="number" id="pedido-anticipo" placeholder="0.00" step="0.01"></div>
+              <div class="form-group"><label>Estado</label><select id="pedido-estado"><option value="pendiente">Pendiente</option><option value="listo">Listo para entregar</option></select></div>
+            </div>
+            <div class="form-grid" style="margin-bottom:12px">
+              <div class="form-group"><label>Producto</label><select id="pedido-prod"><option value="">— Seleccionar —</option></select></div>
+              <div class="form-group"><label>Cantidad</label><input type="number" id="pedido-cantidad" value="1" min="1"></div>
+              <div class="form-group"><label>Precio unit.</label><input type="number" id="pedido-precio" placeholder="0.00" step="0.01"></div>
+              <div class="form-group full"><label>Notas</label><input type="text" id="pedido-notas" placeholder="Detalles especiales, decoración, etc."></div>
+            </div>
+            <div id="pedido-items" style="margin-bottom:12px"></div>
+            <div id="pedido-total" style="margin-bottom:12px;font-weight:500"></div>
+            <div class="form-actions">
+              <button class="btn btn-secondary" onclick="agregarItemPedido()">+ Agregar producto</button>
+              <button class="btn btn-primary" onclick="registrarPedido()">✓ Registrar pedido</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel derecho: búsqueda + vista lista/calendario -->
+        <div class="card">
+          <div class="card-header" style="flex-direction:column;align-items:stretch;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span class="card-title">Pedidos activos</span>
+              <div style="display:flex;gap:6px">
+                <button id="btn-vista-lista" class="btn btn-secondary btn-sm" onclick="setPedidosVista('lista')" style="background:var(--caramel);color:#fff;border-color:var(--caramel)">☰ Lista</button>
+                <button id="btn-vista-cal" class="btn btn-secondary btn-sm" onclick="setPedidosVista('calendario')">📅 Calendario</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input class="search-input" id="pedidos-q" placeholder="Buscar por cliente…" oninput="renderPedidosActivos()" style="flex:1;min-width:0">
+              <select id="pedidos-filtro" onchange="renderPedidosActivos()" style="padding:6px 8px;font-size:.78rem;border:1px solid var(--border);border-radius:var(--r);background:var(--cream);flex-shrink:0">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="listo">Listos</option>
+                <option value="entregado_sin_cobrar">Cobro pendiente</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div id="pedidos-vista-lista"><div id="pedidos-list"></div></div>
+            <div id="pedidos-vista-cal" style="display:none;padding:12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:17px">
+        <div class="card-header">
+          <span class="card-title">Historial de pedidos</span>
+          <span id="pedidos-stats" style="font-size:.79rem;color:var(--text3)"></span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="table-wrap">
+            <table id="tbl-pedidos">
+              <thead><tr>
+                <th>Fecha</th><th>Cliente</th><th>Productos</th><th>Total</th><th>Anticipo</th><th>Saldo</th><th>Entrega</th><th>Estado</th><th>Cobro</th><th></th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="pag-pedidos"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COSTOS -->
+    <div id="s-costos" class="section">
+      <div class="grid2-70" style="margin-bottom:17px">
+        <!-- Lista de recetas -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Recetas</span>
+            <span id="costos-resumen-label" style="font-size:.76rem;color:var(--text3)"></span>
+          </div>
+          <div class="card-body" id="costos-lista"></div>
+        </div>
+        <!-- Panel de detalle -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" id="costo-det-title">Seleccioná una receta</span>
+          </div>
+          <div class="card-body" id="costos-det"><p class="empty">Hacé clic en una receta para ver el análisis de costos.</p></div>
+        </div>
+      </div>
+      <!-- Gastos fijos -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Gastos fijos del negocio</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="gastos-fijos-total-label" style="font-size:.76rem;color:var(--text3)"></span>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalGastoFijo()">+ Agregar</button>
+          </div>
+        </div>
+        <div class="card-body" id="gastos-fijos-lista"></div>
+      </div>
+    </div>
+
+    <!-- FINANZAS -->
+    <div id="s-finanzas" class="section">
+
+      <!-- Header Section -->
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:var(--brown2);margin:0">💰 Finanzas del negocio</h2>
+            <p style="font-size:.85rem;color:var(--text3);margin:4px 0 0">Control de retiros, préstamos y flujo de caja</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="search-input" id="fin-periodo-analisis" onchange="renderFinanzas()" style="width:160px;font-size:.78rem">
+              <option value="mes_actual">Este mes</option>
+              <option value="mes_anterior">Mes anterior</option>
+              <option value="3meses">Últimos 3 meses</option>
+              <option value="todo">Todo el historial</option>
+            </select>
+            <button class="btn btn-warning btn-sm" onclick="diagnosticarFinanzasCompras()" title="Diagnosticar compras en finanzas">🔍 Diag</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen Ejecutivo Financiero -->
+      <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,var(--cream2),var(--white));border:1px solid var(--border)">
+        <div class="card-header" style="background:transparent;border:none;padding-bottom:12px">
+          <span class="card-title" style="color:var(--brown2);font-size:1.1rem">📊 Resumen del Período</span>
+          <span style="font-size:.75rem;color:var(--text3);background:var(--caramel);color:white;padding:2px 8px;border-radius:10px" id="periodo-badge">Este mes</span>
+        </div>
+        <div class="card-body" style="padding-top:0">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+            <!-- Ingresos -->
+            <div style="text-align:center;padding:16px;background:var(--ok-bg);border-radius:12px;border:1px solid var(--ok)">
+              <div style="font-size:.8rem;color:var(--text3);margin-bottom:4px">💰 INGRESOS</div>
+              <div style="font-size:1.4rem;font-weight:700;color:var(--ok);font-family:'Playfair Display',serif" id="resumen-ingresos">$0.00</div>
+              <div style="font-size:.7rem;color:var(--text3);margin-top:4px" id="resumen-ingresos-det">0 ventas</div>
+            </div>
+            <!-- Gastos -->
+            <div style="text-align:center;padding:16px;background:var(--danger-bg);border-radius:12px;border:1px solid var(--danger)">
+              <div style="font-size:.8rem;color:var(--text3);margin-bottom:4px">💸 GASTOS</div>
+              <div style="font-size:1.4rem;font-weight:700;color:var(--danger);font-family:'Playfair Display',serif" id="resumen-gastos">$0.00</div>
+              <div style="font-size:.7rem;color:var(--text3);margin-top:4px" id="resumen-gastos-det">Compras + operativos</div>
+            </div>
+            <!-- Flujo Neto -->
+            <div style="text-align:center;padding:16px;background:var(--warn-bg);border-radius:12px;border:1px solid var(--warn)">
+              <div style="font-size:.8rem;color:var(--text3);margin-bottom:4px">📈 FLUJO NETO</div>
+              <div style="font-size:1.4rem;font-weight:700;color:var(--warn);font-family:'Playfair Display',serif" id="resumen-flujo">$0.00</div>
+              <div style="font-size:.7rem;color:var(--text3);margin-top:4px">Ingresos - Gastos</div>
+            </div>
+            <!-- Disponible -->
+            <div style="text-align:center;padding:16px;background:var(--cream);border-radius:12px;border:1px solid var(--border)">
+              <div style="font-size:.8rem;color:var(--text3);margin-bottom:4px">💎 DISPONIBLE</div>
+              <div style="font-size:1.4rem;font-weight:700;color:var(--caramel);font-family:'Playfair Display',serif" id="resumen-disponible">$0.00</div>
+              <div style="font-size:.7rem;color:var(--text3);margin-top:4px" id="resumen-disponible-det">Para retiros</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs Detallados -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <span class="card-title">📋 Indicadores Detallados</span>
+          <button class="btn btn-secondary btn-sm" onclick="toggleKPIDetails()" id="toggle-kpi-btn">📊 Ver detalles</button>
+        </div>
+        <div class="card-body" id="kpi-details-content" style="display:none">
+          <div class="kpi-cards-row">
+            <div class="kpi-card kpi-card-green">
+              <div class="kpi-title">EFECTIVO OPERATIVO</div>
+              <div class="kpi-value" id="kpi-efectivo-operativo">$0.00</div>
+              <div class="kpi-subtitle" id="kpi-efectivo-operativo-detalle">Ventas + Préstamos con devolución - Compras - Retiros</div>
+            </div>
+            <div class="kpi-card kpi-card-blue">
+              <div class="kpi-title">CAPITAL TOTAL</div>
+              <div class="kpi-value" id="kpi-capital-total">$0.00</div>
+              <div class="kpi-subtitle" id="kpi-capital-total-detalle">Efectivo operativo + Préstamos sin devolución</div>
+            </div>
+          </div>
+          <div class="kpi-cards-row" style="margin-top:16px">
+            <div class="kpi-card kpi-card-orange">
+              <div class="kpi-title">GASTOS OPERATIVOS</div>
+              <div class="kpi-value" id="kpi-gastos">$0.00</div>
+              <div class="kpi-subtitle" id="kpi-gastos-detalle">Costos variables + Fijos + Compras</div>
+            </div>
+            <div class="kpi-card kpi-card-green">
+              <div class="kpi-title">SALDO LIBRE</div>
+              <div class="kpi-value" id="kpi-saldo">$0.00</div>
+              <div class="kpi-subtitle" id="kpi-saldo-detalle">Disponible - ya retirado</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs de navegación -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="showFinanzasTab('movimientos')">� Movimientos</button>
+        <button class="tab-btn" onclick="showFinanzasTab('prestamos')">🏦 Préstamos</button>
+        <button class="tab-btn" onclick="showFinanzasTab('estadisticas')">📈 Estadísticas</button>
+        <button class="tab-btn" onclick="showFinanzasTab('analisis')">📊 Análisis</button>
+      </div>
+
+      <!-- Contenido Tab: Movimientos -->
+      <div id="fin-tab-movimientos" class="fin-tab-content active">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+          <!-- Panel: Registrar Retiro -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.1rem">💵</span>
+                <span>Registrar Retiro</span>
+              </span>
+              <span style="font-size:.7rem;color:var(--text3);background:var(--cream2);padding:3px 8px;border-radius:12px">Movimientos de salida</span>
+            </div>
+            <div class="card-body">
+              <input type="hidden" id="ext-edit-id" value="">
+              <div class="form-grid" style="margin-bottom:12px">
+                <div class="form-group">
+                  <label>Fecha</label>
+                  <input type="date" id="ext-fecha">
+                </div>
+                <div class="form-group">
+                  <label>Categoría</label>
+                  <select id="ext-tipo">
+                    <option value="salario">🏠 Sueldo / salario personal</option>
+                    <option value="dividendo">📈 Dividendo / ganancia</option>
+                    <option value="reinversion">🔄 Reinversión en el negocio</option>
+                    <option value="reserva">🏦 Fondo de reserva</option>
+                    <option value="gasto_personal">🛍 Gasto personal</option>
+                    <option value="impuesto">📑 Impuestos / tasas</option>
+                    <option value="otro">📌 Otro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Monto ($)</label>
+                  <input type="number" id="ext-monto" step="0.01" min="0" placeholder="0.00" oninput="calcExtraccion()">
+                </div>
+                <div class="form-group">
+                  <label>Período</label>
+                  <select id="ext-periodo" onchange="renderFinanzas()">
+                    <option value="mes_actual">Mes actual</option>
+                    <option value="mes_anterior">Mes anterior</option>
+                    <option value="semana">Última semana</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label>Concepto / descripción</label>
+                  <input type="text" id="ext-concepto" placeholder="Ej: Sueldo marzo, Impuesto municipal, Compra equipo...">
+                </div>
+              </div>
+              <div id="ext-preview" style="margin-bottom:12px"></div>
+              <div class="form-actions">
+                <button class="btn btn-primary" id="ext-btn-guardar" onclick="registrarExtraccion()">💵 Registrar retiro</button>
+                <button class="btn btn-secondary" id="ext-btn-cancelar" style="display:none" onclick="cancelarEdicionExtraccion()">✕ Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel: Análisis de Retiros -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.1rem">📊</span>
+                <span>Análisis de Retiros</span>
+              </span>
+              <span style="font-size:.7rem;color:var(--text3);background:var(--ok-bg);padding:3px 8px;border-radius:12px">Recomendaciones</span>
+            </div>
+            <div class="card-body" id="fin-sugerido-body"></div>
+          </div>
+        </div>
+
+        <!-- Historial de Retiros -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:1.1rem">📋</span>
+              <span>Historial de Retiros</span>
+            </span>
+            <span id="ext-stats" style="font-size:.79rem;color:var(--text3)"></span>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+              <table id="tbl-ext">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Categoría</th>
+                    <th>Concepto</th>
+                    <th>Monto</th>
+                    <th>Período</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido Tab: Préstamos -->
+      <div id="fin-tab-prestamos" class="fin-tab-content">
+        <div style="background:linear-gradient(135deg,var(--cream2) 0%,var(--cream) 100%);border-radius:var(--rl);padding:24px;margin-bottom:24px;border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+            <div>
+              <h3 style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:var(--brown2);margin:0;display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.3rem">🏦</span>
+                Préstamos Personales
+              </h3>
+              <p style="font-size:.82rem;color:var(--text3);margin:4px 0 0">Capital propio invertido en el negocio con seguimiento de devolución</p>
+            </div>
+            <button class="btn btn-primary" onclick="abrirModalPrestamo()" style="display:flex;align-items:center;gap:6px">
+              <span>＋</span>
+              <span>Nuevo Préstamo</span>
+            </button>
+          </div>
+
+          <!-- KPIs de Préstamos -->
+          <div class="stats-row" id="prest-stats-row" style="margin-bottom:16px;background:var(--white);border-radius:var(--r);padding:12px"></div>
+
+          <!-- Tabla de Préstamos -->
+          <div class="card" style="background:var(--white);border-color:var(--brown2)">
+            <div class="card-body" style="padding:0">
+              <div class="table-wrap">
+                <table id="tbl-prest">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Prestamista</th>
+                      <th>Concepto</th>
+                      <th>Depositado</th>
+                      <th>Devuelto</th>
+                      <th>Saldo</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido Tab: Análisis -->
+      <div id="fin-tab-analisis" class="fin-tab-content">
+        <div class="grid2" style="margin-bottom:24px">
+          <!-- Panel: Flujo de Caja -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.1rem">💰</span>
+                <span>Flujo de Caja</span>
+              </span>
+              <span style="font-size:.7rem;color:var(--text3);background:var(--cream2);padding:3px 8px;border-radius:12px">Resumen mensual</span>
+            </div>
+            <div class="card-body" id="analisis-flujo"></div>
+          </div>
+
+          <!-- Panel: Proyecciones -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.1rem">📈</span>
+                <span>Proyecciones</span>
+              </span>
+              <span style="font-size:.7rem;color:var(--text3);background:var(--ok-bg);padding:3px 8px;border-radius:12px">Estimaciones</span>
+            </div>
+            <div class="card-body" id="analisis-proyecciones"></div>
+          </div>
+        </div>
+
+        <!-- Gráfico de Evolución -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:1.1rem">📊</span>
+              <span>Evolución Financiera</span>
+            </span>
+            <select class="search-input" id="analisis-periodo" onchange="renderAnalisisGrafico()" style="width:140px;font-size:.78rem">
+              <option value="6meses">Últimos 6 meses</option>
+              <option value="1ano">Último año</option>
+              <option value="todo">Todo el historial</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <canvas id="grafico-evolucion-financiera" style="max-height:300px"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal préstamo -->
+      <div id="modal-prestamo" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-prestamo')">
+        <div class="modal">
+          <div class="modal-header">
+            <span class="modal-title" id="prest-modal-titulo">🏦 Nuevo préstamo</span>
+            <button class="modal-close" onclick="cerrarModalPrestamo()">✕</button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="prest-edit-id">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Fecha del depósito</label>
+                <input type="date" id="prest-fecha">
+              </div>
+              <div class="form-group">
+                <label>Prestamista</label>
+                <input type="text" id="prest-prestamista" placeholder="Ej: Leo, Paola, Abuela…">
+              </div>
+              <div class="form-group">
+                <label>Monto depositado ($)</label>
+                <input type="number" id="prest-monto" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group full">
+                <label>Concepto / propósito</label>
+                <input type="text" id="prest-concepto" placeholder="Ej: Capital inicial, Compra de insumos al por mayor...">
+              </div>
+              <div class="form-group full">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="prest-devolver" onchange="togglePrestDevolucion()" style="width:16px;height:16px;cursor:pointer">
+                  <span>¿Se debe devolver este dinero?</span>
+                </label>
+              </div>
+              <div id="prest-devolucion-opts" style="display:none;grid-column:1/-1">
+                <div style="background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px">
+                  <div style="font-size:.85rem;font-weight:600;color:var(--brown2);margin-bottom:2px">Modalidad de devolución</div>
+                  <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.85rem;padding:8px;background:var(--white);border-radius:var(--r);border:1px solid transparent">
+                    <input type="radio" name="prest-modalidad" value="produccion" id="prest-mod-prod" checked style="margin-top:3px">
+                    <div>
+                      <strong>% por producción</strong><br>
+                      <span style="font-size:.77rem;color:var(--text3)">Se descuenta automáticamente un porcentaje de cada producción</span>
+                    </div>
+                  </label>
+                  <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.85rem;padding:8px;background:var(--white);border-radius:var(--r);border:1px solid transparent">
+                    <input type="radio" name="prest-modalidad" value="manual" id="prest-mod-manual" style="margin-top:3px">
+                    <div>
+                      <strong>Pagos manuales</strong><br>
+                      <span style="font-size:.77rem;color:var(--text3)">Los pagos se registran manualmente cuando se realizan</span>
+                    </div>
+                  </label>
+                  <div id="prest-pct-field" style="margin-top:8px">
+                    <label style="font-size:.82rem;color:var(--text2);display:block;margin-bottom:6px">% a descontar por producción</label>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <input type="number" id="prest-pct" min="1" max="100" step="0.5" value="10" style="width:100px" class="search-input">
+                      <span style="font-size:.83rem;color:var(--text3)">% del valor estimado de cada producción</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-secondary" onclick="cerrarModalPrestamo()">Cancelar</button>
+              <button class="btn btn-primary" onclick="guardarPrestamo()">💾 Guardar préstamo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal detalle préstamo / pago manual -->
+      <div id="modal-prest-detalle" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-prest-detalle')">
+        <div class="modal modal-lg">
+          <div class="modal-header">
+            <span class="modal-title" id="prest-det-titulo">Detalle del préstamo</span>
+            <button class="modal-close" onclick="cerrarModalPrestDetalle()">✕</button>
+          </div>
+          <div class="modal-body" id="prest-det-body"></div>
+          <div style="padding:0 22px 18px">
+            <button class="btn btn-secondary" onclick="cerrarModalPrestDetalle()">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido Tab: Estadísticas Generales -->
+      <div id="fin-tab-estadisticas" class="fin-tab-content">
+        <!-- 1. Selector de período -->
+        <div class="card" style="margin-bottom:17px">
+          <div class="card-header">
+            <span class="card-title">Período de análisis</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="periodo-selector" onchange="cambiarPeriodo()" style="padding:6px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--cream);font-size:.86rem">
+                <option value="7">Últimos 7 días</option>
+                <option value="30" selected>Últimos 30 días</option>
+                <option value="90">Últimos 90 días</option>
+                <option value="mes_actual">Este mes</option>
+                <option value="mes_pasado">Mes pasado</option>
+              </select>
+              <span id="periodo-actual" style="font-size:.78rem;color:var(--text3);font-weight:500"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Stats principales -->
+        <div class="stats-row" id="stats-financieros" style="margin-bottom:17px"></div>
+
+        <!-- 3. Gráfico temporal ingresos vs gastos -->
+        <div class="card" style="margin-bottom:17px">
+          <div class="card-header">
+            <span class="card-title">Ingresos vs Gastos</span>
+            <span id="stats-chart-label" style="font-size:.76rem;color:var(--text3)"></span>
+          </div>
+          <div class="card-body" style="padding:16px 20px">
+            <canvas id="stats-linea-chart" height="110"></canvas>
+            <p class="empty" id="stats-linea-empty" style="display:none">Sin datos suficientes para graficar.</p>
+          </div>
+        </div>
+
+        <!-- 4. Alertas inteligentes -->
+        <div class="card" id="alertas-card" style="margin-bottom:17px;display:none">
+          <div class="card-header"><span class="card-title">⚠ Alertas del período</span></div>
+          <div class="card-body" id="alertas-contenido"></div>
+        </div>
+
+        <!-- 5. Top Productos + Top Clientes -->
+        <div class="grid2" style="margin-bottom:17px">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Top productos del período</span></div>
+            <div class="card-body" id="stats-top-productos"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Top clientes</span></div>
+            <div class="card-body" id="top-clientes"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido Tab: Análisis Detallado -->
+      <div id="fin-tab-analisis-detallado" class="fin-tab-content">
+        <!-- 1. Selector de período (replicado) -->
+        <div class="card" style="margin-bottom:17px">
+          <div class="card-header">
+            <span class="card-title">Período de análisis</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="periodo-selector-detallado" onchange="cambiarPeriodoDetallado()" style="padding:6px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--cream);font-size:.86rem">
+                <option value="7">Últimos 7 días</option>
+                <option value="30" selected>Últimos 30 días</option>
+                <option value="90">Últimos 90 días</option>
+                <option value="mes_actual">Este mes</option>
+                <option value="mes_pasado">Mes pasado</option>
+              </select>
+              <span id="periodo-actual-detallado" style="font-size:.78rem;color:var(--text3);font-weight:500"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Proyección + Punto de equilibrio -->
+        <div class="grid2" style="margin-bottom:17px">
+          <div class="card" id="proyeccion-card" style="display:none">
+            <div class="card-header"><span class="card-title">📈 Proyección al cierre del mes</span></div>
+            <div class="card-body" id="proyeccion-mensual"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">🎯 Punto de equilibrio</span></div>
+            <div class="card-body" id="punto-equilibrio"></div>
+          </div>
+        </div>
+
+        <!-- 3. Comparativa de productos entre períodos -->
+        <div class="card" style="margin-bottom:17px">
+          <div class="card-header">
+            <span class="card-title">Productos — comparativa vs período anterior</span>
+            <span id="stats-comp-label" style="font-size:.76rem;color:var(--text3)"></span>
+          </div>
+          <div class="card-body" id="stats-comparativa-productos"></div>
+        </div>
+
+        <!-- 4. Indicadores Financieros + Producción -->
+        <div class="grid2" style="margin-bottom:17px">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Indicadores financieros</span></div>
+            <div class="card-body" id="stats-financieros-detalle"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Indicadores de producción</span></div>
+            <div class="card-body" id="stats-produccion-detalle"></div>
+          </div>
+        </div>
+
+        <!-- 5. Indicadores de Ventas + Gastos en compras -->
+        <div class="grid2" style="margin-bottom:17px">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Indicadores de ventas</span></div>
+            <div class="card-body" id="stats-ventas-detalle"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Gastos en compras</span></div>
+            <div class="card-body" id="stats-compras-detalle"></div>
+          </div>
+        </div>
+
+        <!-- 6. Balance real — ancho completo -->
+        <div class="card" style="margin-bottom:17px">
+          <div class="card-header"><span class="card-title">Balance real — ingresos vs gastos</span></div>
+          <div class="card-body" id="stats-balance"></div>
+        </div>
+      </div>
+
+    </div><!-- end s-finanzas -->
+
+    <!-- VENTAS -->
+    <div id="s-ventas" class="section">
+      <div class="grid2-70" style="margin-bottom:17px">
+        <div class="card">
+          <div class="card-header"><span class="card-title" id="venta-form-title">Registrar venta</span></div>
+          <div class="card-body">
+            <input type="hidden" id="venta-edit-id" value="">
+            <div class="form-grid" style="margin-bottom:12px">
+              <div class="form-group"><label>Producción</label><select id="venta-prod" onchange="calcVenta()"><option value="">— Seleccionar —</option></select></div>
+              <div class="form-group"><label>Unidades vendidas</label><input type="number" id="venta-unidades" value="1" min="1" oninput="calcVenta()"></div>
+              <div class="form-group"><label>Precio unitario ($)</label><input type="number" id="venta-precio" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
+              <div class="form-group"><label>Propina ($) <span style="font-size:.7rem;color:var(--text3);font-weight:400">opcional</span></label><input type="number" id="venta-propina" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
+              <div class="form-group"><label>Fecha</label><input type="date" id="venta-fecha"></div>
+              <div class="form-group">
+                <label>Canal de venta</label>
+                <select id="venta-canal">
+                  <option value="">— Sin especificar —</option>
+                  <option value="directo">Directo</option>
+                  <option value="encargo">Encargo</option>
+                  <option value="tienda">Tienda</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="evento">Evento</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Cliente / Nota</label>
+                <div style="position:relative">
+                  <input type="text" id="venta-nota" placeholder="Ej: María - Cumpleaños" oninput="mostrarSugerenciasVentas(this.value)" onfocus="mostrarSugerenciasVentas(this.value)" onblur="ocultarSugerenciasVentas()">
+                  <div id="sugerencias-ventas" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:var(--r);max-height:200px;overflow-y:auto;z-index:1000;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.1)"></div>
+                </div>
+              </div>
+            </div>
+            <div class="price-box">
+              <div class="price-row">
+                <span>Subtotal:</span>
+                <span id="venta-subtotal">$0.00</span>
+              </div>
+              <div class="price-row">
+                <span>Propina:</span>
+                <span id="venta-propina-display">$0.00</span>
+              </div>
+              <div class="price-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+                <strong>Total:</strong>
+                <strong id="venta-total">$0.00</strong>
+              </div>
+            </div>
+            <div id="venta-info" style="margin-bottom:10px"></div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="venta-btn-guardar" onclick="registrarVenta()">✓ Registrar venta</button>
+              <button class="btn btn-secondary" id="btn-cancelar-venta" style="display:none" onclick="cancelarEdicionVenta()">✕ Cancelar</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Resumen del día</span></div>
+          <div class="card-body" id="ventas-dia"></div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:17px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Control de merma</span></div>
+          <div class="card-body" id="merma-control"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Top productos rentables</span></div>
+          <div class="card-body" id="top-rentables"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historial de ventas</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="ventas-stats" style="font-size:.79rem;color:var(--text3)"></span>
+            <select class="search-input" id="ventas-canal-f" onchange="renderVentasTable()" style="width:130px">
+              <option value="">Todos los canales</option>
+              <option value="directo">Directo</option>
+              <option value="encargo">Encargo</option>
+              <option value="tienda">Tienda</option>
+              <option value="delivery">Delivery</option>
+              <option value="evento">Evento</option>
+              <option value="otro">Otro</option>
+              <option value="">Sin canal</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0"><div class="table-wrap">
+          <table id="tbl-ventas"><thead><tr><th>Fecha</th><th>Producto</th><th>Und.</th><th>Precio/u</th><th>Total</th><th>Propina</th><th>Costo</th><th>Ganancia</th><th>Margen</th><th>Canal</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+        <div id="pag-ventas"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPRAS -->
+    <div id="s-historial" class="section">
+      <div class="grid2-70">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Compras de insumos</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <input class="search-input" id="hist-q" placeholder="Buscar ingrediente…" oninput="_pagReset('hist');renderHistorial()" style="width:140px">
+              <select class="search-input" id="hist-prov" onchange="_pagReset('hist');renderHistorial()" style="width:140px"><option value="">Todos los proveedores</option></select>
+              <input type="date" id="hist-desde" onchange="_pagReset('hist');renderHistorial()" style="padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--cream);font-size:.82rem;color:var(--text)">
+              <input type="date" id="hist-hasta" onchange="_pagReset('hist');renderHistorial()" style="padding:6px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--cream);font-size:.82rem;color:var(--text)">
+              <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosHist()" title="Limpiar filtros">✕ Limpiar</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarComprasCSV()" title="Exportar a CSV">↓ CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="abrirModalCompra()">+ Compra</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0"><div class="table-wrap">
+            <table id="tbl-hist"><thead><tr><th>Fecha</th><th>Ingrediente</th><th>Cantidad</th><th>Precio/u</th><th>Total</th><th>Proveedor</th><th>Notas</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+          <div id="pag-hist"></div>
+          </div>
+        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Análisis de gastos</span></div><div class="card-body" id="hist-resumen"></div></div>
+      </div>
+    </div>
+
+    <!-- PROVEEDORES (OCULTO) -->
+    <div id="s-proveedores" class="section">
+      <!-- Tarjetas de resumen -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:20px">
+        <div class="card" style="background:linear-gradient(135deg,var(--caramel),#8B6B47);color:white;border:none">
+          <div style="padding:16px">
+            <div style="font-size:.75rem;opacity:0.9;margin-bottom:4px">📊 Total proveedores</div>
+            <div style="font-size:1.8rem;font-weight:700" id="prov-total-count">0</div>
+            <div style="font-size:.75rem;opacity:0.8;margin-top:4px">Activos en el sistema</div>
+          </div>
+        </div>
+        <div class="card" style="background:linear-gradient(135deg,var(--ok),#5A9B5A);color:white;border:none">
+          <div style="padding:16px">
+            <div style="font-size:.75rem;opacity:0.9;margin-bottom:4px">🏪 Principal</div>
+            <div style="font-size:1.2rem;font-weight:700" id="prov-principal-name">—</div>
+            <div style="font-size:.75rem;opacity:0.8;margin-top:4px">Mayor volumen de compras</div>
+          </div>
+        </div>
+        <div class="card" style="background:linear-gradient(135deg,var(--warn),#D4A574);color:white;border:none">
+          <div style="padding:16px">
+            <div style="font-size:.75rem;opacity:0.9;margin-bottom:4px">💰 Invertido este mes</div>
+            <div style="font-size:1.4rem;font-weight:700" id="prov-mes-total">$0</div>
+            <div style="font-size:.75rem;opacity:0.8;margin-top:4px">En compras de insumos</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Filtros y búsqueda -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🏪 Directorio de proveedores</span>
+          <div style="display:flex;gap:8px">
+            <input class="search-input" id="prov-search" placeholder="Buscar proveedor..." oninput="filtrarProveedores()" style="width:180px">
+            <select class="search-input" id="prov-filter" onchange="filtrarProveedores()" style="width:140px">
+              <option value="">Todos</option>
+              <option value="principal">Principal</option>
+              <option value="con-compras">Con compras</option>
+              <option value="sin-compras">Sin compras</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalProv()">+ Agregar</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0"><div class="table-wrap">
+          <table id="tbl-prov"><thead><tr><th>Nombre</th><th>Contacto</th><th>Productos</th><th>Ings.</th><th>Compras</th><th>Total gastado</th><th>Última compra</th><th></th></tr></thead><tbody></tbody></table>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL INGREDIENTE -->
+<div class="modal-overlay" id="modal-ing">
+  <div class="modal"><div class="modal-header"><span class="modal-title" id="ing-title">Agregar ingrediente</span><button class="modal-close" onclick="closeModal('modal-ing')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-grid cols3" style="margin-bottom:13px">
+      <div class="form-group full"><label>Nombre</label><input id="ing-nombre" placeholder="Ej: Harina 0000"></div>
+      <div class="form-group"><label>Categoría</label><select id="ing-cat"><option>Harinas</option><option>Azúcares</option><option>Lácteos</option><option>Huevos</option><option>Grasas</option><option>Levaduras</option><option>Saborizantes</option><option>Coberturas</option><option>Rellenos</option><option>Otros</option></select></div>
+      <div class="form-group"><label>Unidad</label><select id="ing-unidad"><option>kg</option><option>g</option><option>l</option><option>ml</option><option>unid.</option><option>caja</option><option>paquete</option></select></div>
+      <div class="form-group"><label>Stock actual</label><input type="number" id="ing-stock" step="0.001" min="0" placeholder="0"></div>
+      <div class="form-group"><label>Stock mínimo</label><input type="number" id="ing-min" step="0.001" min="0" placeholder="0"></div>
+      <div class="form-group"><label>Precio/unidad ($)</label><input type="number" id="ing-precio" step="0.01" min="0" placeholder="0.00"></div>
+      </div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('modal-ing')">Cancelar</button><button class="btn btn-primary" onclick="guardarIng()">Guardar</button></div>
+  </div></div>
+</div>
+
+<!-- MODAL AJUSTE STOCK -->
+<div class="modal-overlay" id="modal-ajuste">
+  <div class="modal" style="width:380px"><div class="modal-header"><span class="modal-title" id="ajuste-title">Ajustar stock</span><button class="modal-close" onclick="closeModal('modal-ajuste')">✕</button></div>
+  <div class="modal-body">
+    <div id="ajuste-info" style="font-size:.83rem;color:var(--text2);margin-bottom:14px;padding:10px;background:var(--cream);border-radius:var(--r)"></div>
+    <div class="tabs">
+      <div class="tab active" id="tab-sumar" onclick="setTab('sumar')">Sumar</div>
+      <div class="tab" id="tab-restar" onclick="setTab('restar')">Restar</div>
+      <div class="tab" id="tab-fijar" onclick="setTab('fijar')">Fijar valor</div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px"><label id="ajuste-lbl">Cantidad a sumar</label><input type="number" id="ajuste-qty" step="0.001" min="0" placeholder="0"></div>
+    <div class="form-group"><label>Motivo (opcional)</label><input type="text" id="ajuste-motivo" placeholder="Merma, corrección…"></div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('modal-ajuste')">Cancelar</button><button class="btn btn-primary" onclick="confirmarAjuste()">Aplicar</button></div>
+  </div></div>
+</div>
+
+<!-- MODAL RECETA -->
+<div class="modal-overlay" id="modal-rec">
+  <div class="modal modal-lg"><div class="modal-header"><span class="modal-title" id="rec-title">Nueva receta</span><button class="modal-close" onclick="closeModal('modal-rec')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group"><label>Nombre</label><input id="rec-nombre" placeholder="Ej: Torta de chocolate"></div>
+      <div class="form-group"><label>Categoría</label><select id="rec-cat"></select></div>
+      <div class="form-group"><label>Rinde (unidades)</label><input type="number" id="rec-rinde" value="1" min="1"></div>
+      <div class="form-group"><label>Tiempo (min)</label><input type="number" id="rec-tiempo" value="60" min="1"></div>
+      <div class="form-group full"><label>Instrucciones / notas</label><textarea id="rec-desc" placeholder="Temperatura, pasos clave…"></textarea></div>
+    </div>
+    <div style="font-size:.77rem;font-weight:500;color:var(--text2);margin-bottom:7px">Ingredientes (por tanda)</div>
+    <div id="rec-ings"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addIngRow()" style="margin-bottom:14px">+ Agregar ingrediente</button>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('modal-rec')">Cancelar</button><button class="btn btn-primary" onclick="guardarReceta()">Guardar receta</button></div>
+  </div></div>
+</div>
+
+<!-- MODAL VER RECETA -->
+<div class="modal-overlay" id="modal-ver-rec">
+  <div class="modal modal-lg"><div class="modal-header"><span class="modal-title" id="ver-rec-title"></span><button class="modal-close" onclick="closeModal('modal-ver-rec')">✕</button></div>
+  <div class="modal-body" id="ver-rec-body"></div></div>
+</div>
+
+<!-- MODAL PROVEEDOR -->
+<div class="modal-overlay" id="modal-prov">
+  <div class="modal" style="width:500px"><div class="modal-header"><span class="modal-title" id="prov-title">Agregar proveedor</span><button class="modal-close" onclick="closeModal('modal-prov')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="form-group full"><label>Nombre</label><input id="prov-nombre" placeholder="Ej: Harinera del Sur SA"></div>
+      <div class="form-group"><label>Contacto</label><input id="prov-contacto" placeholder="Nombre"></div>
+      <div class="form-group"><label>Teléfono / WhatsApp</label><input id="prov-tel" placeholder="+54 11 ..."></div>
+      <div class="form-group"><label>Email</label><input type="email" id="prov-email" placeholder="email@..."></div>
+      <div class="form-group full"><label>Productos que vende</label><input id="prov-prods" placeholder="Harina, azúcar, levadura…"></div>
+      <div class="form-group full"><label>Dirección / Zona</label><input id="prov-dir" placeholder="Ej: Av. San Martín 450, zona norte…"></div>
+      <div class="form-group full"><label>Notas</label><textarea id="prov-notas" rows="2" placeholder="Días de entrega, condiciones…"></textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal('modal-prov')">Cancelar</button><button class="btn btn-primary" onclick="guardarProv()">Guardar</button></div>
+  </div></div>
+</div>
+
+<!-- MODAL VER PROVEEDOR -->
+<div class="modal-overlay" id="modal-ver-prov">
+  <div class="modal" style="width:440px"><div class="modal-header"><span class="modal-title" id="ver-prov-title"></span><button class="modal-close" onclick="closeModal('modal-ver-prov')">✕</button></div>
+  <div class="modal-body" id="ver-prov-body"></div></div>
+</div>
+
+<!-- MODAL: Detalle de diferencias Drive -->
+<div class="modal-overlay" id="modal-gdrive-detalle">
+  <div class="modal modal-lg" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="gdrive-detalle-title">Detalle</span>
+      <button class="modal-close" onclick="closeModal('modal-gdrive-detalle');openModal('modal-gdrive-conflicto')">✕</button>
+    </div>
+    <div class="modal-body" id="gdrive-detalle-body"></div>
+  </div>
+</div>
+
+<!-- MODAL VER PEDIDO -->
+<!-- Modal: Conflicto Google Drive -->
+<div class="modal-overlay" id="modal-gdrive-conflicto">
+  <div class="modal modal-lg" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title">☁ Datos en Google Drive</span>
+      <button class="modal-close" onclick="closeModal('modal-gdrive-conflicto')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Fechas -->
+      <div id="gdrive-diff-fechas" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+
+      <!-- Tabla comparativa -->
+      <div style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:7px;letter-spacing:.04em;text-transform:uppercase">Resumen de datos en Drive</div>
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:7px 10px;text-align:left;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);font-weight:500">Sección</th>
+              <th style="padding:7px 10px;text-align:center;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);font-weight:500">☁ Drive</th>
+              <th style="padding:7px 10px;text-align:center;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);font-weight:500">📱 Local</th>
+              <th style="padding:7px 10px;text-align:center;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);font-weight:500">Diferencia</th>
+            </tr>
+          </thead>
+          <tbody id="gdrive-diff-tabla"></tbody>
+        </table>
+      </div>
+
+      <!-- Botones de acción -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="gdriveReemplazarLocal()" class="btn btn-primary" style="justify-content:flex-start;padding:11px 15px">
+          <span style="font-size:1rem">⬇</span>
+          <div style="text-align:left">
+            <div style="font-weight:600">Usar datos de Drive</div>
+            <div style="font-size:.75rem;opacity:.75;font-weight:400">Reemplaza los datos locales con la versión de Google Drive</div>
+          </div>
+        </button>
+        <button onclick="gdriveSobrescribirDrive()" class="btn btn-secondary" style="justify-content:flex-start;padding:11px 15px">
+          <span style="font-size:1rem">⬆</span>
+          <div style="text-align:left">
+            <div style="font-weight:600">Usar datos locales</div>
+            <div style="font-size:.75rem;opacity:.75;font-weight:400">Sube los datos locales a Drive, reemplazando la versión allí</div>
+          </div>
+        </button>
+        <button onclick="closeModal('modal-gdrive-conflicto')" class="btn btn-secondary">Cancelar — no cambiar nada</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- MODAL COMPRA -->
+<div class="modal-overlay" id="modal-compra">
+  <div class="modal modal-compra-profesional">
+    <div class="modal-header">
+      <div class="modal-title-section">
+        <span class="modal-title" id="compra-modal-title">Registrar compra de insumo</span>
+        <span class="modal-subtitle">Complete la información de la compra</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-compra')">✕</button>
+    </div>
+    
+    <div class="modal-body">
+      <input type="hidden" id="compra-edit-id" value="">
+      
+      <!-- Aviso de edición -->
+      <div id="compra-edit-aviso" class="alert-aviso" style="display:none">
+        <div class="aviso-icono">✎</div>
+        <div class="aviso-texto">
+          <strong>Editando compra existente</strong><br>
+          El stock se ajustará automáticamente con la diferencia.
+        </div>
+      </div>
+
+      <!-- Sección Principal: Detalles de la Compra -->
+      <div class="compra-seccion">
+        <div class="seccion-header">
+          <span class="seccion-titulo">📦 Detalles de la Compra</span>
+        </div>
+        
+        <div class="compra-grid">
+          <!-- Ingrediente -->
+          <div class="compra-field full">
+            <label class="field-label">Ingrediente <span class="required">*</span></label>
+            <div class="input-wrapper">
+              <input type="text" id="compra-ing-input" class="field-input" 
+                     placeholder="Buscar o escribir nombre del ingrediente..." 
+                     oninput="filtrarIngredientesCompra()" onfocus="mostrarSugerenciasIngredientes()" 
+                     onblur="ocultarSugerenciasIngredientes()" autocomplete="off">
+              <input type="hidden" id="compra-ing" value="">
+              <div id="sugerencias-compra-ing" class="sugerencias-lista" style="display:none"></div>
+            </div>
+          </div>
+
+          <!-- Campos para ingrediente nuevo -->
+          <div id="campos-ingrediente-nuevo" class="ingrediente-nuevo-section" style="display:none">
+            <div class="nuevo-ing-header">
+              <span class="nuevo-ing-titulo">⚙️ Configurar Ingrediente Nuevo</span>
+            </div>
+            <div class="nuevo-ing-grid">
+              <div class="compra-field">
+                <label class="field-label">Categoría <span class="required">*</span></label>
+                <select id="nuevo-ing-cat" class="field-select">
+                  <option>Harinas</option><option>Azúcares</option><option>Lácteos</option>
+                  <option>Huevos</option><option>Grasas</option><option>Levaduras</option>
+                  <option>Saborizantes</option><option>Coberturas</option><option>Rellenos</option><option>Otros</option>
+                </select>
+              </div>
+              <div class="compra-field">
+                <label class="field-label">Stock mínimo</label>
+                <input type="number" id="nuevo-ing-min" class="field-input" step="0.001" min="0" placeholder="0">
+              </div>
+              <div class="compra-field">
+                <label class="field-label">Unidad <span class="required">*</span></label>
+                <select id="nuevo-ing-unidad" class="field-select">
+                  <option>kg</option><option>g</option><option>l</option><option>ml</option><option>unidad</option><option>caja</option><option>paquete</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fecha y Proveedor -->
+          <div class="compra-field">
+            <label class="field-label">Fecha <span class="required">*</span></label>
+            <input type="date" id="compra-fecha" class="field-input">
+          </div>
+          
+          <div class="compra-field">
+            <label class="field-label">Proveedor</label>
+            <div class="input-wrapper">
+              <input type="text" id="compra-prov-input" class="field-input" 
+                     placeholder="Buscar o escribir nombre del proveedor..." 
+                     oninput="filtrarProveedoresCompra()" onfocus="mostrarSugerenciasProveedores()" 
+                     onblur="ocultarSugerenciasProveedores()" autocomplete="off">
+              <input type="hidden" id="compra-prov" value="">
+              <div id="sugerencias-compra-prov" class="sugerencias-lista" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección Secundaria: Cantidades y Precios -->
+      <div class="compra-seccion">
+        <div class="seccion-header">
+          <span class="seccion-titulo">💰 Cantidades y Precios</span>
+        </div>
+        
+        <div class="compra-grid">
+          <div class="compra-field">
+            <label class="field-label">Cantidad <span class="required">*</span></label>
+            <input type="number" id="compra-qty" class="field-input" step="0.001" min="0.001" 
+                   placeholder="0.000" oninput="calcularDesdeCantidad()">
+          </div>
+          
+          <div class="compra-field">
+            <label class="field-label">Precio por unidad ($)</label>
+            <input type="number" id="compra-precio" class="field-input" step="0.01" min="0" 
+                   placeholder="0.00" oninput="calcularDesdeCantidad()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección Adicional: Notas -->
+      <div class="compra-seccion">
+        <div class="seccion-header">
+          <span class="seccion-titulo">📝 Notas Adicionales</span>
+        </div>
+        
+        <div class="compra-field full">
+          <label class="field-label">Notas (factura, lote, observaciones)</label>
+          <input type="text" id="compra-notas" class="field-input" 
+                 placeholder="Número de factura, lote, condiciones especiales...">
+        </div>
+      </div>
+
+      <!-- Resumen de Compra -->
+      <div class="compra-resumen">
+        <div class="resumen-content">
+          <div class="resumen-info">
+            <span class="resumen-label">Total de esta compra:</span>
+            <div class="resumen-input-wrapper">
+              <input type="number" id="compra-total" class="resumen-input" 
+                     step="0.01" min="0" placeholder="0.00" 
+                     oninput="calcularDesdeTotal()" onfocus="this.select()">
+              <span class="calculo-indicador" id="calculo-indicador" title="Cálculo automático">🔄</span>
+            </div>
+          </div>
+          <div class="resumen-detalle">
+            <div class="detalle-item">
+              <span class="detalle-label">Cantidad:</span>
+              <span class="detalle-valor" id="detalle-cantidad">0</span>
+            </div>
+            <div class="detalle-item">
+              <span class="detalle-label">Precio unitario:</span>
+              <span class="detalle-valor" id="detalle-precio">$0.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="modal-footer">
+      <div class="footer-acciones">
+        <button class="btn btn-secondary btn-lg" onclick="closeModal('modal-compra')">
+          <span class="btn-icon">✕</span> Cancelar
+        </button>
+        <button class="btn btn-primary btn-lg" id="compra-btn-guardar" onclick="guardarCompra()">
+          <span class="btn-icon">✓</span> Registrar compra
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CATEGORÍAS RECETAS -->
+<div class="modal-overlay" id="modal-cat-rec">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <span class="modal-title">⚙ Categorías de recetas</span>
+      <button class="modal-close" onclick="closeModal('modal-cat-rec')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:12px">
+        Estas categorías aparecen al crear o editar una receta. Las que ya tienen recetas asignadas no se pueden eliminar.
+      </div>
+      <div id="cat-rec-lista" style="margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px">
+        <input id="cat-rec-nueva" class="search-input" placeholder="Nueva categoría…" style="flex:1"
+          onkeydown="if(event.key==='Enter')agregarCatRec()">
+        <button class="btn btn-primary btn-sm" onclick="agregarCatRec()">+ Agregar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GASTO FIJO -->
+<div class="modal-overlay" id="modal-gasto-fijo">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <span class="modal-title" id="gasto-fijo-title">Agregar gasto fijo</span>
+      <button class="modal-close" onclick="closeModal('modal-gasto-fijo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="gasto-fijo-edit-id" value="">
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group full">
+          <label>Descripción</label>
+          <input id="gasto-fijo-nombre" placeholder="Ej: Gas, Electricidad, Embalaje…">
+        </div>
+        <div class="form-group">
+          <label>Monto ($)</label>
+          <input type="number" id="gasto-fijo-monto" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Frecuencia</label>
+          <select id="gasto-fijo-periodo">
+            <option value="mensual">Mensual</option>
+            <option value="semanal">Semanal</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+      </div>
+      <div id="gasto-fijo-equiv" style="font-size:.82rem;color:var(--text3);min-height:18px;margin-bottom:8px"></div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="closeModal('modal-gasto-fijo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarGastoFijo()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VARIACIONES RECETA -->
+<div class="modal-overlay" id="modal-variaciones">
+  <div class="modal" style="width:500px;max-height:600px;overflow-y:auto">
+    <div class="modal-header">
+      <span class="modal-title">Variaciones de Receta</span>
+      <button class="modal-close" onclick="closeModal('modal-variaciones')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="var-receta-info" style="background:var(--cream);padding:10px;border-radius:var(--r);margin-bottom:15px;font-size:.85rem"></div>
+      
+      <div style="margin-bottom:15px">
+        <label style="font-weight:500;margin-bottom:8px;display:block">Tipo de variación</label>
+        <select id="var-tipo" onchange="actualizarCamposVariacion()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--r)">
+          <option value="">Seleccionar tipo</option>
+          <option value="incremento">Incrementar cantidad</option>
+          <option value="decremento">Reducir cantidad</option>
+          <option value="agregar">Agregar ingrediente</option>
+          <option value="reemplazar">Reemplazar ingrediente</option>
+          <option value="eliminar">Eliminar ingrediente</option>
+        </select>
+      </div>
+
+      <div id="var-campos-dinamicos"></div>
+
+      <div style="margin-bottom:15px">
+        <label style="font-weight:500;margin-bottom:8px;display:block">Motivo de la variación (opcional)</label>
+        <input type="text" id="var-motivo" placeholder="Ej: falta de insumo, mejora de sabor, ajuste de consistencia..." 
+               style="width:100%;padding:8px;border:1px solid var(--border);border-radius:var(--r)">
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="closeModal('modal-variaciones')">Cancelar</button>
+        <button class="btn btn-primary" onclick="agregarVariacion()">Agregar variación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ver-pedido" onclick="if(event.target===this)closeModal('modal-ver-pedido')">
+  <div class="modal" id="modal-ver-pedido-inner"></div>
+</div>
+
+<div id="toast"></div>
+
+
+<!-- ══ Módulos JavaScript — cargar en este orden ══ -->
+<script src="js/helpers.js"></script>
+<script src="js/data-init.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/estadisticas.js"></script>
+<script src="js/inventario.js"></script>
+<script src="js/recetas.js"></script>
+<script src="js/produccion.js"></script>
+<script src="js/variaciones.js"></script>
+<script src="js/costos.js"></script>
+<script src="js/gastos-fijos.js"></script>
+<script src="js/historial.js"></script>
+<script src="js/proveedores.js"></script>
+<script src="js/autocomplete.js"></script>
+<script src="js/ventas.js"></script>
+<script src="js/pedidos.js"></script>
+<script src="js/exportar.js"></script>
+<script src="js/init.js"></script>
+<script src="js/google-drive.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/finanzas.js"></script>
+<script src="js/prestamos.js"></script>
+<script src="js/nav-indicators.js"></script>
+</body>
+</html>
