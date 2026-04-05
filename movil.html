@@ -562,6 +562,10 @@ body {
     <span>☁</span>
     <span>Subir a Drive</span>
   </button>
+  <button class="sync-btn" onclick="instalarPWA()" id="btn-instalar-pwa" style="background:var(--ok);margin-left:8px;display:none">
+    <span>⬇</span>
+    <span>Instalar</span>
+  </button>
 </div>
 
 <!-- CONTENT -->
@@ -1887,11 +1891,46 @@ async function _arrancar(){
 setInterval(() => _actualizarSyncStatus(!!_lastSync), 60000);
 _arrancar();
 
-// ── Registrar Service Worker (PWA) ──
+// ── Registrar Service Worker + botón instalación PWA ──
+let _pwaPrompt = null;
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
-    .then(() => console.log('[Movil] SW registrado'))
-    .catch(e => console.warn('[Movil] SW error:', e));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => {
+        console.log('[Movil] SW registrado');
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if(nw.state === 'installed' && navigator.serviceWorker.controller){
+              if(confirm('Hay una actualización disponible. ¿Recargar?')){
+                nw.postMessage('skipWaiting');
+                location.reload();
+              }
+            }
+          });
+        });
+      })
+      .catch(e => console.warn('[Movil] SW error:', e));
+  });
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  const btn = document.getElementById('btn-instalar-pwa');
+  if(btn) btn.style.display = 'flex';
+});
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  const btn = document.getElementById('btn-instalar-pwa');
+  if(btn) btn.style.display = 'none';
+  toast('✅ App instalada correctamente');
+});
+async function instalarPWA(){
+  if(!_pwaPrompt){ toast('Usá el menú del navegador → "Instalar aplicación"', 3500); return; }
+  _pwaPrompt.prompt();
+  const { outcome } = await _pwaPrompt.userChoice;
+  if(outcome === 'accepted') toast('✅ Instalando app…');
+  _pwaPrompt = null;
 }
 </script>
 </body>
