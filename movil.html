@@ -389,6 +389,34 @@ body {
 .prog-fill.warn { background: var(--warn); }
 .prog-fill.danger { background: var(--danger); }
 
+/* ══ AUTOCOMPLETADO ══ */
+.ac-wrap { position: relative; }
+.ac-wrap input {
+  width: 100%; box-sizing: border-box;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  color: var(--text); font-size: 1rem;
+  font-family: 'DM Sans', sans-serif; outline: none;
+}
+.ac-wrap input:focus { border-color: var(--caramel); }
+.ac-list {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--card); border: 1px solid var(--caramel);
+  border-radius: 10px; z-index: 100;
+  max-height: 200px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.ac-list.open { display: block; }
+.ac-item {
+  padding: 11px 14px; cursor: pointer;
+  font-size: .9rem; color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:active, .ac-item:hover { background: var(--card2); }
+.ac-item.ac-new { color: var(--caramel2); font-weight: 600; }
+.ac-item .ac-sub { font-size: .75rem; color: var(--text3); margin-left: auto; }
 /* ══ TOAST ══ */
 #toast {
   position: fixed;
@@ -630,10 +658,64 @@ body {
 
   <!-- ══ SCREEN: PEDIDOS ══ -->
   <div class="screen" id="screen-pedidos">
-    <div class="section-title">
-      📋 Pedidos activos
-      <span class="badge-count" id="pedidos-count" style="display:none"></span>
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📋 Pedidos activos <span class="badge-count" id="pedidos-count" style="display:none"></span></span>
+      <button class="btn btn-primary btn-sm" onclick="_mostrarFormPedido()" style="font-size:.8rem;padding:6px 12px">+ Nuevo</button>
     </div>
+
+    <!-- Formulario nuevo pedido (oculto por defecto) -->
+    <div id="form-pedido-movil" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--caramel2);margin-bottom:12px">✏️ Nuevo pedido</div>
+        <div class="field">
+          <label>Cliente</label>
+          <input type="text" id="np-cliente" placeholder="Nombre del cliente…">
+        </div>
+        <div class="field">
+          <label>Fecha de entrega</label>
+          <input type="date" id="np-fecha">
+        </div>
+        <div class="field">
+          <label>Anticipo ($)</label>
+          <input type="number" id="np-anticipo" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Notas</label>
+          <input type="text" id="np-notas" placeholder="Observaciones del pedido…">
+        </div>
+
+        <div style="font-size:.8rem;font-weight:600;color:var(--caramel2);margin:10px 0 6px">Productos del pedido</div>
+        <div id="np-items-list"></div>
+
+        <!-- Agregar ítem -->
+        <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:10px">
+          <div class="ac-wrap" id="ac-receta-wrap" style="margin-bottom:8px">
+            <input type="text" id="np-receta-txt" autocomplete="off" placeholder="Buscar producto/receta…" oninput="_acRecetaInput()" onfocus="_acRecetaInput()">
+            <div class="ac-list" id="ac-receta-list"></div>
+          </div>
+          <input type="hidden" id="np-receta-id">
+          <div class="field-row">
+            <div class="field">
+              <label>Cantidad</label>
+              <input type="number" id="np-cant" min="1" step="1" inputmode="numeric" placeholder="1">
+            </div>
+            <div class="field">
+              <label>Precio/u ($)</label>
+              <input type="number" id="np-precio" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="_agregarItemPedido()" style="margin-top:4px">+ Agregar producto</button>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="registrarPedidoMovil()" style="flex:1">✓ Crear pedido</button>
+          <button class="btn btn-secondary" onclick="_mostrarFormPedido(false)" style="flex:0 0 auto">✕</button>
+        </div>
+      </div>
+    </div>
+    </div>
+
     <div id="pedidos-list-movil">
       <div class="empty-state">
         <div class="empty-icon">📋</div>
@@ -649,12 +731,38 @@ body {
 
     <div class="card">
       <div class="card-body">
+
+        <!-- Ingrediente con autocompletado + crear nuevo -->
         <div class="field">
           <label>Ingrediente</label>
-          <select id="c-ing">
-            <option value="">— Seleccionar —</option>
-          </select>
+          <div class="ac-wrap" id="ac-ing-wrap">
+            <input type="text" id="c-ing-txt" autocomplete="off" placeholder="Escribí para buscar…" oninput="_acIngInput()" onfocus="_acIngInput()">
+            <div class="ac-list" id="ac-ing-list"></div>
+          </div>
+          <input type="hidden" id="c-ing-id">
+          <!-- Panel crear nuevo ingrediente -->
+          <div id="c-ing-nuevo-panel" style="display:none;margin-top:8px;background:var(--card2);border:1px solid var(--caramel);border-radius:10px;padding:12px">
+            <div style="font-size:.8rem;color:var(--caramel2);font-weight:600;margin-bottom:8px">✨ Nuevo ingrediente</div>
+            <div class="field-row">
+              <div class="field">
+                <label>Unidad</label>
+                <select id="c-ing-unidad">
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="l">l</option>
+                  <option value="ml">ml</option>
+                  <option value="unidad">unidad</option>
+                  <option value="u">u</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Stock mín.</label>
+                <input type="number" id="c-ing-min" step="0.001" min="0" placeholder="0" inputmode="decimal">
+              </div>
+            </div>
+          </div>
         </div>
+
         <div class="field-row">
           <div class="field">
             <label>Cantidad</label>
@@ -665,12 +773,17 @@ body {
             <input type="number" id="c-precio" step="0.01" min="0" inputmode="decimal" placeholder="0.00" oninput="calcCompra()">
           </div>
         </div>
+
+        <!-- Proveedor con autocompletado + crear nuevo -->
         <div class="field">
           <label>Proveedor (opcional)</label>
-          <select id="c-prov">
-            <option value="">— Seleccionar —</option>
-          </select>
+          <div class="ac-wrap" id="ac-prov-wrap">
+            <input type="text" id="c-prov-txt" autocomplete="off" placeholder="Escribí para buscar…" oninput="_acProvInput()" onfocus="_acProvInput()">
+            <div class="ac-list" id="ac-prov-list"></div>
+          </div>
+          <input type="hidden" id="c-prov-id">
         </div>
+
         <div class="field">
           <label>Notas (factura, lote…)</label>
           <input type="text" id="c-notas" placeholder="Número de factura, observaciones…">
@@ -953,6 +1066,12 @@ function _aplicarPendientes(){
       const ing = (_data.ingredientes||[]).find(i => i.id == op.data.ingId);
       if(ing) ing.stock = +(ing.stock + op.data.qty).toFixed(4);
     }
+    if(op.type === 'nuevo_pedido'){
+      if(!_data.pedidos) _data.pedidos = [];
+      // Evitar duplicados
+      if(!_data.pedidos.find(p => p.id == op.data.id))
+        _data.pedidos.push(op.data);
+    }
     if(op.type === 'pedido_estado'){
       const p = (_data.pedidos||[]).find(pe => pe.id == op.id);
       if(p){
@@ -1164,6 +1283,116 @@ function renderVentasHoy(){
 const _estadoLabel = {pendiente:'Pendiente',listo:'Listo ✓',entregado_sin_cobrar:'Cobro pendiente',entregado:'Cobrado ✓'};
 const _estadoBadge = {pendiente:'badge-warn',listo:'badge-ok',entregado_sin_cobrar:'badge-warn',entregado:'badge-text3'};
 
+// ══════════════════════════════════════════════
+//  AUTOCOMPLETADO — Recetas (para pedidos)
+// ══════════════════════════════════════════════
+function _acRecetaInput(){
+  const txt  = (document.getElementById('np-receta-txt')?.value||'').trim().toLowerCase();
+  const list = document.getElementById('ac-receta-list');
+  if(!list) return;
+  const recetas = (_data ? _data.recetas||[] : [])
+    .filter(r => !txt || r.nombre.toLowerCase().includes(txt))
+    .slice(0, 10);
+
+  list.innerHTML = recetas.map(r =>
+    `<div class="ac-item" onclick="_selReceta(${r.id},'${r.nombre.replace(/'/g,"\'")}',${r.precio||0})">
+      ${r.nombre} <span class="ac-sub">${r.precio > 0 ? fmt(r.precio) : ''}</span>
+    </div>`
+  ).join('') || '<div class="ac-item" style="color:var(--text3)">Sin recetas</div>';
+
+  list.classList.toggle('open', true);
+}
+
+function _selReceta(id, nombre, precio){
+  document.getElementById('np-receta-id').value  = id;
+  document.getElementById('np-receta-txt').value = nombre;
+  if(precio > 0) document.getElementById('np-precio').value = precio.toFixed(2);
+  document.getElementById('ac-receta-list').classList.remove('open');
+  document.getElementById('np-cant').focus();
+}
+
+// Items temporales del nuevo pedido
+let _npItems = [];
+
+function _mostrarFormPedido(show = true){
+  const form = document.getElementById('form-pedido-movil');
+  form.style.display = show ? 'block' : 'none';
+  if(show){
+    _npItems = [];
+    _renderNpItems();
+    // Fecha por defecto: mañana
+    const m = new Date(); m.setDate(m.getDate() + 1);
+    document.getElementById('np-fecha').value = m.toISOString().split('T')[0];
+    document.getElementById('np-cliente').focus();
+  }
+}
+
+function _agregarItemPedido(){
+  const recetaId = parseInt(document.getElementById('np-receta-id').value);
+  const nombre   = document.getElementById('np-receta-txt').value.trim();
+  const cant     = parseInt(document.getElementById('np-cant').value)||0;
+  const precio   = parseFloat(document.getElementById('np-precio').value)||0;
+
+  if(!recetaId || cant <= 0){ toast('⚠ Seleccioná producto y cantidad'); return; }
+
+  // Si ya existe ese recetaId, sumar cantidad
+  const existe = _npItems.find(it => it.recetaId == recetaId);
+  if(existe){ existe.cantidad += cant; }
+  else { _npItems.push({ recetaId, nombre, cantidad: cant, precio }); }
+
+  // Limpiar campos de ítem
+  document.getElementById('np-receta-id').value  = '';
+  document.getElementById('np-receta-txt').value = '';
+  document.getElementById('np-cant').value    = '';
+  document.getElementById('np-precio').value  = '';
+  _renderNpItems();
+}
+
+function _renderNpItems(){
+  const cont = document.getElementById('np-items-list');
+  if(!_npItems.length){
+    cont.innerHTML = '<div style="color:var(--text3);font-size:.85rem;margin-bottom:8px">Sin productos agregados</div>';
+    return;
+  }
+  const total = _npItems.reduce((a,it) => a + it.cantidad * it.precio, 0);
+  cont.innerHTML = _npItems.map((it, idx) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:.9rem">${it.nombre} <span style="color:var(--text3)">×${it.cantidad}</span></div>
+      <div style="color:var(--caramel2);font-size:.9rem">${fmt(it.cantidad * it.precio)}</div>
+      <button onclick="_npItems.splice(${idx},1);_renderNpItems()" style="background:none;border:none;color:var(--danger);font-size:1rem;cursor:pointer;padding:4px">✕</button>
+    </div>`
+  ).join('') +
+  `<div style="text-align:right;font-weight:700;color:var(--caramel2);padding-top:8px;font-size:.95rem">Total: ${fmt(total)}</div>`;
+}
+
+async function registrarPedidoMovil(){
+  if(!_data){ toast('⚠ Sin datos cargados. Sincronizá primero.'); return; }
+  const cliente  = document.getElementById('np-cliente').value.trim();
+  const fecha    = document.getElementById('np-fecha').value;
+  const anticipo = parseFloat(document.getElementById('np-anticipo').value)||0;
+  const notas    = document.getElementById('np-notas').value.trim();
+
+  if(!cliente){ toast('⚠ Ingresá el nombre del cliente'); return; }
+  if(!_npItems.length){ toast('⚠ Agregá al menos un producto'); return; }
+
+  const id = _nextId('pedidos');
+  const pedido = {
+    id, cliente, fechaEntrega: fecha||null,
+    anticipo, notas, estado: 'pendiente',
+    items: _npItems.map(it => ({ recetaId: it.recetaId, cantidad: it.cantidad, precio: it.precio })),
+    ventaIds: []
+  };
+
+  if(!_data.pedidos) _data.pedidos = [];
+  _data.pedidos.push(pedido);
+  await _guardarCacheIDB();
+  await _guardarPendiente({ type: 'nuevo_pedido', data: pedido });
+
+  _mostrarFormPedido(false);
+  renderPedidosMovil();
+  toast(`✓ Pedido de ${cliente} creado`);
+}
+
 function renderPedidosMovil(){
   const cont = document.getElementById('pedidos-list-movil');
   if(!_data){ cont.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Sincronizá para ver pedidos</div></div>'; return; }
@@ -1322,27 +1551,99 @@ function modalEntregaMovil(id){
 // ══════════════════════════════════════════════
 //  COMPRAS
 // ══════════════════════════════════════════════
-function renderComprasMovil(){
-  const selIng = document.getElementById('c-ing');
-  const selProv = document.getElementById('c-prov');
-  const curIng = selIng.value;
+// ══════════════════════════════════════════════
+//  AUTOCOMPLETADO — Ingredientes
+// ══════════════════════════════════════════════
+function _acIngInput(){
+  const txt   = document.getElementById('c-ing-txt').value.trim().toLowerCase();
+  const list  = document.getElementById('ac-ing-list');
+  const ings  = (_data ? _data.ingredientes||[] : [])
+    .filter(i => !txt || i.nombre.toLowerCase().includes(txt))
+    .sort((a,b) => a.nombre.localeCompare(b.nombre))
+    .slice(0, 10);
 
-  selIng.innerHTML = '<option value="">— Seleccionar —</option>';
-  selProv.innerHTML = '<option value="">— Sin proveedor —</option>';
+  let html = ings.map(i =>
+    `<div class="ac-item" onclick="_selIng(${i.id},'${i.nombre.replace(/'/g,"\'")}','${i.unidad}')">
+      ${i.nombre} <span class="ac-sub">${i.unidad}</span>
+    </div>`
+  ).join('');
 
-  if(_data){
-    (_data.ingredientes||[]).sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(i => {
-      const opt = document.createElement('option');
-      opt.value = i.id; opt.textContent = i.nombre + ' (' + i.unidad + ')';
-      if(String(i.id) === curIng) opt.selected = true;
-      selIng.appendChild(opt);
-    });
-    (_data.proveedores||[]).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id; opt.textContent = p.nombre;
-      selProv.appendChild(opt);
-    });
+  // Opción crear nuevo si no hay coincidencia exacta
+  const exacto = ings.find(i => i.nombre.toLowerCase() === txt);
+  if(txt && !exacto){
+    html += `<div class="ac-item ac-new" onclick="_crearIngNuevo('${txt.replace(/'/g,"\'")}')">
+      ✨ Crear "${txt}"
+    </div>`;
   }
+
+  list.innerHTML = html || '<div class="ac-item" style="color:var(--text3)">Sin resultados</div>';
+  list.classList.toggle('open', txt.length > 0 || document.activeElement === document.getElementById('c-ing-txt'));
+}
+
+function _selIng(id, nombre, unidad){
+  document.getElementById('c-ing-id').value  = id;
+  document.getElementById('c-ing-txt').value = nombre;
+  document.getElementById('ac-ing-list').classList.remove('open');
+  document.getElementById('c-ing-nuevo-panel').style.display = 'none';
+}
+
+function _crearIngNuevo(nombre){
+  document.getElementById('c-ing-id').value  = '__nuevo__';
+  document.getElementById('c-ing-txt').value = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  document.getElementById('ac-ing-list').classList.remove('open');
+  document.getElementById('c-ing-nuevo-panel').style.display = 'block';
+}
+
+// Cerrar lista al tocar fuera
+document.addEventListener('click', e => {
+  if(!e.target.closest('#ac-ing-wrap'))  document.getElementById('ac-ing-list').classList.remove('open');
+  if(!e.target.closest('#ac-prov-wrap')) document.getElementById('ac-prov-list').classList.remove('open');
+  if(!e.target.closest('#ac-receta-wrap')) { const l=document.getElementById('ac-receta-list'); if(l) l.classList.remove('open'); }
+});
+
+// ══════════════════════════════════════════════
+//  AUTOCOMPLETADO — Proveedores
+// ══════════════════════════════════════════════
+function _acProvInput(){
+  const txt  = document.getElementById('c-prov-txt').value.trim().toLowerCase();
+  const list = document.getElementById('ac-prov-list');
+  const provs = (_data ? _data.proveedores||[] : [])
+    .filter(p => !txt || p.nombre.toLowerCase().includes(txt))
+    .slice(0, 8);
+
+  let html = provs.map(p =>
+    `<div class="ac-item" onclick="_selProv(${p.id},'${p.nombre.replace(/'/g,"\'")}')">
+      ${p.nombre}
+    </div>`
+  ).join('');
+
+  const exacto = provs.find(p => p.nombre.toLowerCase() === txt);
+  if(txt && !exacto){
+    html += `<div class="ac-item ac-new" onclick="_crearProvNuevo('${txt.replace(/'/g,"\'")}')">
+      ✨ Crear proveedor "${txt}"
+    </div>`;
+  }
+
+  list.innerHTML = html || (txt ? '<div class="ac-item" style="color:var(--text3)">Sin resultados</div>' : '');
+  list.classList.toggle('open', txt.length > 0 || document.activeElement === document.getElementById('c-prov-txt'));
+}
+
+function _selProv(id, nombre){
+  document.getElementById('c-prov-id').value  = id;
+  document.getElementById('c-prov-txt').value = nombre;
+  document.getElementById('ac-prov-list').classList.remove('open');
+}
+
+function _crearProvNuevo(nombre){
+  document.getElementById('c-prov-id').value  = '__nuevo__';
+  document.getElementById('c-prov-txt').value = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  document.getElementById('ac-prov-list').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════
+//  COMPRAS
+// ══════════════════════════════════════════════
+function renderComprasMovil(){
   renderComprasRecientes();
 }
 
@@ -1357,35 +1658,65 @@ function calcCompra(){
 }
 
 async function registrarCompraMovil(){
-  const ingId = parseInt(document.getElementById('c-ing').value);
-  const qty = parseFloat(document.getElementById('c-qty').value)||0;
-  const precio = parseFloat(document.getElementById('c-precio').value)||0;
-  const provId = parseInt(document.getElementById('c-prov').value)||null;
-  const notas = document.getElementById('c-notas').value.trim();
+  if(!_data){ toast('⚠ Sin datos cargados. Sincronizá primero.'); return; }
 
-  if(!ingId || qty <= 0){ toast('⚠ Completá ingrediente y cantidad'); return; }
+  const ingIdRaw  = document.getElementById('c-ing-id').value;
+  const ingNombre = document.getElementById('c-ing-txt').value.trim();
+  const qty       = parseFloat(document.getElementById('c-qty').value)||0;
+  const precio    = parseFloat(document.getElementById('c-precio').value)||0;
+  const provIdRaw = document.getElementById('c-prov-id').value;
+  const provNombre= document.getElementById('c-prov-txt').value.trim();
+  const notas     = document.getElementById('c-notas').value.trim();
 
-  const id = _nextId('historialCompras');
-  const compra = { id, ingId, qty, precio: precio||0, fecha: today(), provId, notas };
+  if(!ingNombre || qty <= 0){ toast('⚠ Completá ingrediente y cantidad'); return; }
 
-  if(_data){
-    if(!_data.historialCompras) _data.historialCompras = [];
-    _data.historialCompras.push(compra);
-    const ing = (_data.ingredientes||[]).find(i => i.id == ingId);
-    if(ing){
-      ing.stock = +(ing.stock + qty).toFixed(4);
-      if(precio > 0) ing.precio = precio;
-    }
-    await _guardarCacheIDB();
+  let ingId = ingIdRaw === '__nuevo__' ? null : parseInt(ingIdRaw)||null;
+
+  // Crear ingrediente nuevo si hace falta
+  if(!ingId && ingNombre){
+    const unidad = document.getElementById('c-ing-unidad')?.value || 'kg';
+    const min    = parseFloat(document.getElementById('c-ing-min')?.value)||0;
+    ingId = _nextId('ingredientes');
+    const nuevoIng = { id: ingId, nombre: ingNombre, unidad, stock: 0, min, precio: precio||0 };
+    if(!_data.ingredientes) _data.ingredientes = [];
+    _data.ingredientes.push(nuevoIng);
+    toast(`✨ Ingrediente "${ingNombre}" creado`);
   }
 
+  if(!ingId){ toast('⚠ Seleccioná o creá un ingrediente'); return; }
+
+  // Crear proveedor nuevo si hace falta
+  let provId = provIdRaw === '__nuevo__' ? null : parseInt(provIdRaw)||null;
+  if(!provId && provNombre){
+    provId = _nextId('proveedores');
+    if(!_data.proveedores) _data.proveedores = [];
+    _data.proveedores.push({ id: provId, nombre: provNombre, contacto: '', notas: '' });
+    toast(`✨ Proveedor "${provNombre}" creado`);
+  }
+
+  const id = _nextId('historialCompras');
+  const compra = { id, ingId, qty, precio: precio||0, fecha: today(), provId: provId||null, notas };
+
+  if(!_data.historialCompras) _data.historialCompras = [];
+  _data.historialCompras.push(compra);
+  const ing = (_data.ingredientes||[]).find(i => i.id == ingId);
+  if(ing){
+    ing.stock = +(ing.stock + qty).toFixed(4);
+    if(precio > 0) ing.precio = precio;
+  }
+  await _guardarCacheIDB();
   await _guardarPendiente({ type: 'compra', data: compra });
 
-  document.getElementById('c-ing').value = '';
-  document.getElementById('c-qty').value = '';
+  // Limpiar formulario
+  document.getElementById('c-ing-id').value  = '';
+  document.getElementById('c-ing-txt').value = '';
+  document.getElementById('c-prov-id').value  = '';
+  document.getElementById('c-prov-txt').value = '';
+  document.getElementById('c-qty').value    = '';
   document.getElementById('c-precio').value = '';
-  document.getElementById('c-notas').value = '';
+  document.getElementById('c-notas').value  = '';
   document.getElementById('c-total-bar').style.display = 'none';
+  document.getElementById('c-ing-nuevo-panel').style.display = 'none';
 
   renderComprasMovil();
   toast(`✓ Compra registrada — ${fmt(qty * precio)}`);
