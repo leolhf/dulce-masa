@@ -1065,17 +1065,22 @@ function _aplicarPendientes(){
   if(!_data) return;
   _pendiente.forEach(op => {
     if(op.type === 'venta'){
+      // Solo agregar si no existe ya (fue registrada localmente en el momento)
       if(!_data.ventas) _data.ventas = [];
-      _data.ventas.push(op.data);
-      // Actualizar stockProductos
-      const sp = (_data.stockProductos||[]).find(s => s.recetaId == op.data.recetaId);
-      if(sp) sp.stock = Math.max(0, sp.stock - op.data.unidades);
+      if(!_data.ventas.find(v => v.id === op.data.id)){
+        _data.ventas.push(op.data);
+        const sp = (_data.stockProductos||[]).find(s => s.recetaId == op.data.recetaId);
+        if(sp) sp.stock = Math.max(0, sp.stock - op.data.unidades);
+      }
     }
     if(op.type === 'compra'){
+      // Solo agregar si no existe ya
       if(!_data.historialCompras) _data.historialCompras = [];
-      _data.historialCompras.push(op.data);
-      const ing = (_data.ingredientes||[]).find(i => i.id == op.data.ingId);
-      if(ing) ing.stock = +(ing.stock + op.data.qty).toFixed(4);
+      if(!_data.historialCompras.find(c => c.id === op.data.id)){
+        _data.historialCompras.push(op.data);
+        const ing = (_data.ingredientes||[]).find(i => i.id == op.data.ingId);
+        if(ing) ing.stock = +(ing.stock + op.data.qty).toFixed(4);
+      }
     }
     if(op.type === 'nuevo_pedido'){
       if(!_data.pedidos) _data.pedidos = [];
@@ -1267,7 +1272,9 @@ function renderVentasHoy(){
   if(!_data){ cont.innerHTML = ''; return; }
   const hoy = today();
   // Incluir pendientes locales también
-  const pendientesVentas = _pendiente.filter(p => p.type === 'venta').map(p => p.data);
+  // Solo agregar pendientes que aún no están en _data.ventas (evitar duplicados)
+  const ventasIds = new Set((_data.ventas||[]).map(v => v.id));
+  const pendientesVentas = _pendiente.filter(p => p.type === 'venta' && !ventasIds.has(p.data.id)).map(p => p.data);
   const todas = [...(_data.ventas||[]), ...pendientesVentas];
   const hoyV = todas.filter(v => v.fecha === hoy)
     .sort((a,b) => (b.id||0) - (a.id||0))
@@ -1393,7 +1400,7 @@ async function registrarPedidoMovil(){
 
   const id = _nextId('pedidos');
   const pedido = {
-    id, cliente, fechaEntrega: fecha||null,
+    id, fecha: today(), cliente, fechaEntrega: fecha||null,
     anticipo, notas, estado: 'pendiente',
     items: _npItems.map(it => ({ recetaId: it.recetaId, cantidad: it.cantidad, precio: it.precio })),
     ventaIds: []
@@ -1460,7 +1467,7 @@ function renderPedidosMovil(){
     } else if(p.estado === 'listo'){
       btns = `<button class="btn btn-ok btn-sm" onclick="modalEntregaMovil(${p.id})">📦 Entregar</button>`;
     } else if(p.estado === 'entregado_sin_cobrar'){
-      btns = `<button class="btn btn-primary btn-sm" onclick="accionPedidoMovil(${p.id},'entregado')">💰 Cobrar</button>`;
+      btns = `<button class="btn btn-primary btn-sm" onclick="modalCobrarMovil(${p.id})">💰 Registrar cobro</button>`;
     }
 
     return `<div class="pedido-card ${cls}">
@@ -1508,6 +1515,9 @@ async function accionPedidoMovil(id, nuevoEstado){
   }
 
   let ventasGeneradas = null;
+  if(nuevoEstado === 'entregado_sin_cobrar'){
+    p.fechaEntregaReal = today();
+  }
   if(nuevoEstado === 'entregado'){
     if(!_data.ventas) _data.ventas = [];
     ventasGeneradas = [];
@@ -1517,11 +1527,13 @@ async function accionPedidoMovil(id, nuevoEstado){
       _data.ventas.push(v);
       ventasGeneradas.push(v);
     });
+    p.fechaCobro = today();
+    if(!p.fechaEntregaReal) p.fechaEntregaReal = today();
   }
 
   p.estado = nuevoEstado;
   await _guardarCacheIDB();
-  await _guardarPendiente({ type: 'pedido_estado', id, estado: nuevoEstado, ventas: ventasGeneradas });
+  await _guardarPendiente({ type: 'pedido_estado', id, estado: nuevoEstado, ventas: ventasGeneradas, fechaEntregaReal: p.fechaEntregaReal, fechaCobro: p.fechaCobro });
 
   const msgs = { listo: '✓ Pedido listo — stock descontado', entregado_sin_cobrar: '📦 Entregado — cobro pendiente', entregado: '💰 Cobrado — venta registrada' };
   toast(msgs[nuevoEstado] || 'Actualizado');
@@ -1557,6 +1569,41 @@ function modalEntregaMovil(id){
         📦 Entregar — cobro pendiente
       </button>
       <button class="btn btn-secondary" style="margin-top:8px" onclick="document.getElementById('modal-entrega-m').remove()">
+        Cancelar
+      </button>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function modalCobrarMovil(id){
+  if(!_data) return;
+  const p = (_data.pedidos||[]).find(pe => pe.id == id);
+  if(!p) return;
+  const total = (p.items||[]).reduce((a,it) => a + it.cantidad*it.precio, 0);
+  const saldo = total - (p.anticipo||0);
+
+  const prev = document.getElementById('modal-cobrar-m');
+  if(prev) prev.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-cobrar-m';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:20px 20px 16px 16px;width:100%;padding:20px;max-height:80vh;overflow-y:auto">
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--caramel2);margin-bottom:6px">💰 Registrar cobro</div>
+      <div style="font-size:.82rem;color:var(--text2);margin-bottom:14px">${p.cliente}</div>
+      <div style="background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:.85rem">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text2)">Total del pedido</span><strong>${fmt(total)}</strong></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text2)">Anticipo recibido</span><span style="color:var(--ok)">${fmt(p.anticipo||0)}</span></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><strong>Saldo a cobrar</strong><strong style="color:var(--${saldo>0?'danger':'ok'})">${fmt(saldo)}</strong></div>
+      </div>
+      ${p.fechaEntregaReal ? `<div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;text-align:center">Entregado el: ${p.fechaEntregaReal}</div>` : ''}
+      <button class="btn btn-primary" style="margin-bottom:10px" onclick="document.getElementById('modal-cobrar-m').remove();accionPedidoMovil(${id},'entregado')">
+        ✅ Confirmar cobro — ${fmt(saldo)}
+      </button>
+      <button class="btn btn-secondary" style="margin-top:4px" onclick="document.getElementById('modal-cobrar-m').remove()">
         Cancelar
       </button>
     </div>`;
@@ -1741,7 +1788,8 @@ async function registrarCompraMovil(){
 function renderComprasRecientes(){
   const cont = document.getElementById('compras-recientes-list');
   if(!_data){ cont.innerHTML = ''; return; }
-  const pendientesComp = _pendiente.filter(p => p.type === 'compra').map(p => p.data);
+  const comprasIds = new Set((_data.historialCompras||[]).map(c => c.id));
+  const pendientesComp = _pendiente.filter(p => p.type === 'compra' && !comprasIds.has(p.data.id)).map(p => p.data);
   const todas = [...(_data.historialCompras||[]), ...pendientesComp];
   const recientes = todas.sort((a,b) => (b.id||0) - (a.id||0)).slice(0, 8);
   if(!recientes.length){
@@ -1835,7 +1883,7 @@ async function _arrancar(){
     }
     const lsPend = localStorage.getItem('movil_pendiente');
     if(lsPend){
-      try { _pendiente = JSON.parse(lsPend); } catch(e){}
+      try { _pendiente = JSON.parse(lsPend); await _idbSet(db,'movil_pendiente',_pendiente); } catch(e){}
       localStorage.removeItem('movil_pendiente');
     }
     const lsSync = localStorage.getItem('movil_last_sync');
