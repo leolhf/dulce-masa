@@ -957,10 +957,12 @@ async function sincronizar(){
       const payload = Object.assign({}, _data, { _guardado: tsSubida, _version: 2 });
       const res = await fetch(_gasUrl, {
         method: 'POST',
-        body: JSON.stringify({ action: 'save', data: payload })
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
       });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
       const r = await res.json();
-      if(r.ok || r.status === 'ok'){
+      if(r.status === 'ok'){
         _data      = payload;  // fuente de verdad = lo que acabamos de subir
         _pendiente = [];
         _lastSync  = tsSubida;
@@ -1022,10 +1024,12 @@ async function subirADrive(){
     });
     const res = await fetch(_gasUrl, {
       method: 'POST',
-      body: JSON.stringify({ action: 'save', data: payload })
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
     });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
     const r = await res.json();
-    if(r.ok || r.status === 'ok'){
+    if(r.status === 'ok'){
       _data      = payload;
       _pendiente = [];
       _lastSync  = payload._guardado;
@@ -1065,7 +1069,6 @@ function _aplicarPendientes(){
   if(!_data) return;
   _pendiente.forEach(op => {
     if(op.type === 'venta'){
-      // Solo agregar si no existe ya (fue registrada localmente en el momento)
       if(!_data.ventas) _data.ventas = [];
       if(!_data.ventas.find(v => v.id === op.data.id)){
         _data.ventas.push(op.data);
@@ -1074,7 +1077,6 @@ function _aplicarPendientes(){
       }
     }
     if(op.type === 'compra'){
-      // Solo agregar si no existe ya
       if(!_data.historialCompras) _data.historialCompras = [];
       if(!_data.historialCompras.find(c => c.id === op.data.id)){
         _data.historialCompras.push(op.data);
@@ -1272,7 +1274,6 @@ function renderVentasHoy(){
   if(!_data){ cont.innerHTML = ''; return; }
   const hoy = today();
   // Incluir pendientes locales también
-  // Solo agregar pendientes que aún no están en _data.ventas (evitar duplicados)
   const ventasIds = new Set((_data.ventas||[]).map(v => v.id));
   const pendientesVentas = _pendiente.filter(p => p.type === 'venta' && !ventasIds.has(p.data.id)).map(p => p.data);
   const todas = [...(_data.ventas||[]), ...pendientesVentas];
@@ -1582,10 +1583,8 @@ function modalCobrarMovil(id){
   if(!p) return;
   const total = (p.items||[]).reduce((a,it) => a + it.cantidad*it.precio, 0);
   const saldo = total - (p.anticipo||0);
-
   const prev = document.getElementById('modal-cobrar-m');
   if(prev) prev.remove();
-
   const overlay = document.createElement('div');
   overlay.id = 'modal-cobrar-m';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end;padding:16px';
@@ -1603,9 +1602,7 @@ function modalCobrarMovil(id){
       <button class="btn btn-primary" style="margin-bottom:10px" onclick="document.getElementById('modal-cobrar-m').remove();accionPedidoMovil(${id},'entregado')">
         ✅ Confirmar cobro — ${fmt(saldo)}
       </button>
-      <button class="btn btn-secondary" style="margin-top:4px" onclick="document.getElementById('modal-cobrar-m').remove()">
-        Cancelar
-      </button>
+      <button class="btn btn-secondary" style="margin-top:4px" onclick="document.getElementById('modal-cobrar-m').remove()">Cancelar</button>
     </div>`;
   overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
