@@ -361,17 +361,101 @@ function _gdriveMostrarDetalle(key){
 // ── Reemplazar datos locales con los de Drive ──
 function gdriveReemplazarLocal(){
   if(!_gdrivePendingData){ closeModal('modal-gdrive-conflicto'); return; }
-  _cargarDatosJSON(JSON.stringify(_gdrivePendingData));
-  _gdrivePendingData = null;
-  closeModal('modal-gdrive-conflicto');
-  toast('✅ Datos reemplazados con la versión de Google Drive');
+  confirmar({
+    titulo: 'Reemplazar datos locales',
+    mensaje: '¿Estás segura? Los datos locales serán reemplazados con los de Drive. Esta acción no se puede deshacer.',
+    labelOk: 'Sí, reemplazar',
+    tipo: 'warn',
+    onOk: () => {
+      _cargarDatosJSON(JSON.stringify(_gdrivePendingData));
+      _gdrivePendingData = null;
+      closeModal('modal-gdrive-conflicto');
+      toast('✅ Datos reemplazados con la versión de Google Drive');
+    }
+  });
+}
+
+// ── Fusionar Drive + Local (combinar sin perder datos de ningún lado) ──
+async function gdriveFusionar(){
+  if(!_gdrivePendingData){ closeModal('modal-gdrive-conflicto'); return; }
+  confirmar({
+    titulo: 'Fusionar datos',
+    mensaje: 'Se combinarán los datos de Drive y los locales. Si un registro existe en los dos lados, se conservará el de Drive. No se perderá ningún registro.',
+    labelOk: 'Fusionar',
+    tipo: 'info',
+    onOk: async () => {
+      const drive = _gdrivePendingData;
+      const local = buildData();
+
+      // Secciones con arrays de registros con IDs únicos
+      const secciones = [
+        'ingredientes','recetas','producciones','ventas','pedidos',
+        'historialCompras','proveedores','stockProductos',
+        'catRecetas','gastosFijos','extracciones','prestamos'
+      ];
+
+      const merged = Object.assign({}, local);
+
+      secciones.forEach(key => {
+        const localArr = local[key] || [];
+        const driveArr = drive[key] || [];
+
+        if(!driveArr.length && !localArr.length){ merged[key] = []; return; }
+
+        // Indexar por id
+        const localMap = {};
+        localArr.forEach(r => { if(r.id != null) localMap[r.id] = r; });
+
+        const driveMap = {};
+        driveArr.forEach(r => { if(r.id != null) driveMap[r.id] = r; });
+
+        // Todos los IDs únicos
+        const allIds = new Set([
+          ...localArr.map(r => r.id),
+          ...driveArr.map(r => r.id)
+        ]);
+
+        // Drive tiene prioridad en caso de conflicto
+        merged[key] = [...allIds].map(id => driveMap[id] || localMap[id]).filter(Boolean);
+      });
+
+      // nextId: tomar el máximo de cada contador
+      const localNext = local.nextId || {};
+      const driveNext = drive.nextId || {};
+      merged.nextId = {};
+      ['ing','rec','prod','venta','comp','prov','pedido','ext','prestamo'].forEach(k => {
+        merged.nextId[k] = Math.max(localNext[k]||1, driveNext[k]||1);
+      });
+
+      merged._guardado = new Date().toISOString();
+      merged._version  = 2;
+
+      // Cargar datos fusionados localmente
+      _cargarDatosJSON(JSON.stringify(merged));
+      _gdrivePendingData = null;
+      closeModal('modal-gdrive-conflicto');
+
+      // Subir fusión a Drive
+      toast('🔀 Fusionando y guardando en Drive…');
+      await gdriveSave();
+      toast('✅ Datos fusionados correctamente');
+    }
+  });
 }
 
 // ── Sobrescribir Drive con datos locales ──
 async function gdriveSobrescribirDrive(){
-  _gdrivePendingData = null;
-  closeModal('modal-gdrive-conflicto');
-  await gdriveSave();
+  confirmar({
+    titulo: 'Sobrescribir Drive',
+    mensaje: '¿Estás segura? Los datos en Drive serán reemplazados con los datos locales. Los datos que estén solo en Drive se perderán.',
+    labelOk: 'Sí, sobrescribir',
+    tipo: 'warn',
+    onOk: async () => {
+      _gdrivePendingData = null;
+      closeModal('modal-gdrive-conflicto');
+      await gdriveSave();
+    }
+  });
 }
 
 // ── Actualizar UI de Drive en el sidebar ──

@@ -1293,7 +1293,14 @@
 
       <!-- Botones de acción -->
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button onclick="gdriveReemplazarLocal()" class="btn btn-primary" style="justify-content:flex-start;padding:11px 15px">
+        <button onclick="gdriveFusionar()" class="btn btn-primary" style="justify-content:flex-start;padding:11px 15px;background:var(--sage)">
+          <span style="font-size:1rem">🔀</span>
+          <div style="text-align:left">
+            <div style="font-weight:600">Fusionar Drive + Local</div>
+            <div style="font-size:.75rem;opacity:.85;font-weight:400">Combina ambos — conserva todos los registros sin perder nada</div>
+          </div>
+        </button>
+        <button onclick="gdriveReemplazarLocal()" class="btn btn-secondary" style="justify-content:flex-start;padding:11px 15px">
           <span style="font-size:1rem">⬇</span>
           <div style="text-align:left">
             <div style="font-weight:600">Usar datos de Drive</div>
