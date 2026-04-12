@@ -1,0 +1,15 @@
+{
+  "name": "Dulce & Masa · Campo",
+  "short_name": "D&M Campo",
+  "description": "App de campo para ventas, pedidos y compras",
+  "start_url": "/dulce-masa/movil.html",
+  "scope": "/dulce-masa/",
+  "display": "standalone",
+  "background_color": "#0E0A05",
+  "theme_color": "#C47C2B",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

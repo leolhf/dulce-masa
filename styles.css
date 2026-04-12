@@ -1,0 +1,11 @@
+/* ══════════════ DULCE & MASA — STYLES ══════════════
+   Archivos CSS modularizados en css/
+   Cada archivo corresponde a un área funcional de la app
+   ══════════════════════════════════════════════════════ */
+
+@import url('css/base.css');
+@import url('css/nav.css');
+@import url('css/dashboard.css');
+@import url('css/autocomplete.css');
+@import url('css/responsive.css');
+@import url('css/components.css');

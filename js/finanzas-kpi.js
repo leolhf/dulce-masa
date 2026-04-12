@@ -1,0 +1,243 @@
+// ══════════════ FINANZAS — KPIs Y MÉTRICAS ══════════════
+// Núcleo de finanzas.js: métricas, render principal y retiro sugerido
+// CRUD de extracciones: extracciones.js | Préstamos: prestamos-mod.js
+
+// ── Rango de fechas según período ──
+function _finRango(periodo){
+  // Usa inicioMes()/finMes() de timezone.js → siempre en zona configurada
+  let desde, hasta;
+  if (periodo === 'semana'){
+    desde = createDate(rangoUltimosDias(7)[0]);
+    hasta = finMes(0);
+  } else if (periodo === 'mes_actual'){
+    desde = inicioMes(0);
+    hasta = finMes(0);
+  } else if (periodo === 'mes_anterior'){
+    desde = inicioMes(-1);
+    hasta = finMes(-1);
+  } else if (periodo === '3meses'){
+    desde = inicioMes(-2);
+    hasta = finMes(0);
+  } else {
+    desde = createDate('2000-01-01');
+    hasta = finMes(0);
+  }
+  return { desde, hasta };
+}
+
+// ── Métricas financieras para un período ──
+function _finMetricas(periodo){
+  const { desde, hasta } = _finRango(periodo);
+  const enRango = arr => (arr || []).filter(x => {
+    const d = createDate(x.fecha); return d >= desde && d <= hasta;
+  });
+
+  const ventasPer   = enRango(ventas);
+  const comprasPer  = enRango(historialCompras);
+  const extPer      = enRango(extracciones);
+
+  const ingresosBrutos = ventasPer.reduce((a,v) => a + v.unidades * v.precio, 0);
+  const totalPropinas  = ventasPer.reduce((a,v) => a + (v.propina || 0), 0);
+  const ingresosTotal  = ingresosBrutos + totalPropinas;
+
+  const costosVariables = ventasPer.reduce((a,v) => {
+    const r = rec(v.recetaId);
+    return a + (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
+  }, 0);
+
+  const gastosFijosMes = gastosFijos.reduce((a,g) => {
+    if (g.periodo === 'mensual') return a + g.monto;
+    if (g.periodo === 'semanal') return a + g.monto * 4.33;
+    if (g.periodo === 'anual')   return a + g.monto / 12;
+    return a;
+  }, 0);
+
+  const costoCompras  = comprasPer.reduce((a,c) => a + c.qty * c.precio, 0);
+  const gastosTotales = costosVariables + gastosFijosMes + costoCompras;
+  const flujoBruto    = ingresosTotal - gastosTotales;
+  const reservaOp     = Math.max(0, flujoBruto * 0.20);
+  const disponible    = Math.max(0, flujoBruto - reservaOp);
+  const retiroSugerido = Math.max(0, disponible * 0.70);
+  const totalExtraido  = extPer.reduce((a,e) => a + e.monto, 0);
+
+  const prestamosPer           = enRango(prestamos || []);
+  const capitalPrestamos        = prestamosPer.reduce((a,p) => a + p.monto, 0);
+  const prestamosConDevolucion  = prestamosPer.filter(p => p.devolver).reduce((a,p) => a + p.monto, 0);
+  const prestamosSinDevolucion  = prestamosPer.filter(p => !p.devolver).reduce((a,p) => a + p.monto, 0);
+
+  const deudaPrestamos = (prestamos || []).filter(p => p.devolver).reduce((a,p) => {
+    const s = _prestSaldo(p);
+    const autoGen = _prestPagoAutoProduccion(p);
+    return a + Math.max(0, s.pendiente - autoGen);
+  }, 0);
+
+  const saldoLibre        = disponible - totalExtraido;
+  // CORRECCIÓN: Eliminamos prestamosConDevolución del efectivo operativo para evitar doble conteo
+  const efectivoOperativo = ingresosTotal - gastosTotales - totalExtraido;
+  const capitalTotal      = efectivoOperativo + prestamosSinDevolucion + prestamosConDevolucion;
+
+  return {
+    ingresosBrutos, totalPropinas, ingresosTotal,
+    costosVariables, gastosFijosMes, costoCompras,
+    gastosTotales, flujoBruto,
+    reservaOp, disponible, retiroSugerido,
+    totalExtraido, saldoLibre,
+    capitalPrestamos, deudaPrestamos,
+    prestamosConDevolucion, prestamosSinDevolucion,
+    efectivoOperativo, capitalTotal,
+    nVentas: ventasPer.length
+  };
+}
+
+// ── Toggle detalles KPI ──
+function toggleKPIDetails(){
+  const content = $('kpi-details-content');
+  const button  = $('toggle-kpi-btn');
+  if (content.style.display === 'none'){
+    content.style.display = 'block';
+    button.textContent = '📉 Ocultar detalles';
+  } else {
+    content.style.display = 'none';
+    button.textContent = '📊 Ver detalles';
+  }
+}
+
+// ── Fila de resumen financiero ──
+function _finFila(label, valor, tipo, negativo = false){
+  const color   = tipo === 'ok' ? 'var(--ok)' : tipo === 'danger' ? 'var(--danger)' : 'var(--warn)';
+  const display = negativo ? fmt(Math.abs(valor)) : fmt(valor);
+  return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.85rem">
+    <span style="color:var(--text2)">${label}</span>
+    <span style="font-weight:600;color:${color}">${display}</span>
+  </div>`;
+}
+
+// ── Render principal de finanzas ──
+function renderFinanzas(){
+  if (!extracciones) extracciones = [];
+  const periodo = $('fin-periodo-analisis')?.value || 'mes_actual';
+  const m = _finMetricas(periodo);
+
+  const updateElement = (id, content) => { const el = $(id); if (el) el.textContent = content; };
+  const updateHTML    = (id, content) => { const el = $(id); if (el) el.innerHTML   = content; };
+
+  // KPIs superiores
+  updateElement('kpi-efectivo-operativo', fmt(m.efectivoOperativo));
+  updateElement('kpi-efectivo-operativo-detalle', `${fmt(m.ingresosTotal)} - ${fmt(m.gastosTotales)} - ${fmt(m.totalExtraido)}`);
+  updateElement('kpi-capital-total', fmt(m.capitalTotal));
+  updateElement('kpi-capital-total-detalle', `${fmt(m.efectivoOperativo)} + ${fmt(m.prestamosSinDevolucion)} + ${fmt(m.prestamosConDevolucion)}`);
+  updateElement('kpi-ingresos', fmt(m.ingresosTotal));
+  updateElement('kpi-ingresos-detalle', `${fmt(m.ingresosBrutos)} ventas + ${fmt(m.totalPropinas)} propinas`);
+  updateElement('kpi-gastos', fmt(m.gastosTotales));
+  updateElement('kpi-gastos-detalle', `${fmt(m.costosVariables)} costos + ${fmt(m.gastosFijosMes)} fijos + ${fmt(m.costoCompras)} compras`);
+  updateElement('kpi-flujo', fmt(m.flujoBruto));
+  updateElement('kpi-saldo', fmt(m.saldoLibre));
+  updateElement('kpi-saldo-detalle', `Disponible - ya retirado (${fmt(m.totalExtraido)})`);
+
+  // Resumen ejecutivo
+  updateElement('resumen-ingresos', fmt(m.ingresosTotal));
+  updateElement('resumen-ingresos-det', `${m.nVentas || 0} ventas`);
+  updateElement('resumen-gastos', fmt(m.gastosTotales));
+  updateElement('resumen-gastos-det', `${fmt(m.costoCompras)} compras + ${fmt(m.costosVariables + m.gastosFijosMes)} operativos`);
+  updateElement('resumen-flujo', fmt(m.flujoBruto));
+  updateElement('resumen-disponible', fmt(m.disponible));
+  updateElement('resumen-disponible-det', `Para retiros`);
+
+  const textos = { mes_actual:'Este mes', mes_anterior:'Mes anterior', '3meses':'Últimos 3 meses', todo:'Todo el historial' };
+  updateElement('periodo-badge', textos[periodo] || 'Este mes');
+
+  updateHTML('fin-stats-row', `
+    <div class="stat-card ok-card">
+      <div class="stat-label">Efectivo operativo</div>
+      <div class="stat-value">${fmt(m.efectivoOperativo)}</div>
+      <div class="stat-sub">Ventas - Gastos operativos - Retiros</div>
+    </div>
+    <div class="stat-card ${m.capitalTotal >= 0 ? 'ok-card' : 'danger-card'}">
+      <div class="stat-label">Capital total</div>
+      <div class="stat-value">${fmt(m.capitalTotal)}</div>
+      <div class="stat-sub">Efectivo operativo + Todos los préstamos</div>
+    </div>
+    <div class="stat-card ${m.flujoBruto >= 0 ? 'ok-card' : 'danger-card'}">
+      <div class="stat-label">Flujo neto</div>
+      <div class="stat-value">${fmt(m.flujoBruto)}</div>
+      <div class="stat-sub">Ingresos − gastos operativos</div>
+    </div>
+    <div class="stat-card ${m.saldoLibre >= 0 ? 'ok-card' : 'danger-card'}">
+      <div class="stat-label">Saldo libre</div>
+      <div class="stat-value">${fmt(m.saldoLibre)}</div>
+      <div class="stat-sub">(Ingresos - Gastos - Reserva 20%) - Retiros</div>
+    </div>`);
+
+  _renderRetiroSugerido(m);
+  _renderExtTable();      // extracciones.js
+  renderPrestamos();      // prestamos-mod.js
+  // Extras: badge de salud, widget semanal y comparativa (finanzas-extras.js)
+  if (typeof _renderSaludFinanciera === 'function')  _renderSaludFinanciera();
+  if (typeof _renderSemanaFinanciera === 'function') _renderSemanaFinanciera();
+  if (typeof _renderComparativaMes === 'function')   _renderComparativaMes();
+}
+
+// ── Panel de retiro sugerido ──
+function _renderRetiroSugerido(m){
+  const sb = $('fin-sugerido-body');
+  if (!sb) return;
+
+  const pctRetiro = m.disponible > 0 ? Math.round(m.totalExtraido / m.disponible * 100) : 0;
+  const pctColor  = pctRetiro > 100 ? 'var(--danger)' : pctRetiro > 70 ? 'var(--warn)' : 'var(--sage)';
+  const alertaMsg = m.saldoLibre < 0
+    ? `<div style="background:var(--danger-bg);border:1px solid #E8BFBE;border-radius:var(--r);padding:10px 13px;font-size:.83rem;color:var(--danger);margin-bottom:12px">
+         ⚠ Retiraste <strong>${fmt(Math.abs(m.saldoLibre))}</strong> más de lo disponible. Considerá reducir próximos retiros.
+       </div>`
+    : m.saldoLibre < m.reservaOp
+    ? `<div style="background:var(--warn-bg);border:1px solid #E8CCAA;border-radius:var(--r);padding:10px 13px;font-size:.83rem;color:var(--warn);margin-bottom:12px">
+         ⚠ Saldo libre bajo. Asegurate de mantener el fondo de reserva.
+       </div>` : '';
+
+  sb.innerHTML = `
+    ${alertaMsg}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      ${_finFila('💰 Ingresos totales', m.ingresosTotal, 'ok')}
+      ${_finFila('− Costos de ingredientes', -m.costosVariables, 'danger', true)}
+      ${_finFila('− Gastos fijos del negocio', -m.gastosFijosMes, 'danger', true)}
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      ${_finFila('= Flujo neto', m.flujoBruto, m.flujoBruto >= 0 ? 'ok' : 'danger')}
+      ${_finFila('− Reserva operativa (20%)', -m.reservaOp, 'warn', true)}
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      ${_finFila('= Disponible para retirar', m.disponible, 'ok')}
+    </div>
+
+    <div style="background:var(--ok-bg);border:1px solid #BCCFBC;border-radius:var(--r);padding:13px 15px;margin-bottom:14px">
+      <div style="font-size:.72rem;font-weight:600;color:var(--ok);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Retiro sugerido (máx. 70%)</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:700;color:var(--sage)">${fmt(m.retiroSugerido)}</div>
+      <div style="font-size:.77rem;color:var(--text3);margin-top:3px">70% de ${fmt(m.disponible)} disponible</div>
+    </div>
+
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text2);margin-bottom:5px">
+        <span>Ya retirado este período: <strong>${fmt(m.totalExtraido)}</strong></span>
+        <span style="color:${pctColor};font-weight:600">${pctRetiro}%</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill ${pctRetiro > 100 ? 'danger' : pctRetiro > 70 ? 'warn' : 'ok'}" style="width:${Math.min(100, pctRetiro)}%"></div></div>
+    </div>
+
+    <div style="font-size:.76rem;color:var(--text3);border-top:1px solid var(--border2);padding-top:10px;margin-top:10px;line-height:1.7">
+      <strong style="color:var(--text2)">Recomendaciones:</strong><br>
+      🏠 Pagarte un <strong>sueldo fijo mensual</strong> evita la incertidumbre<br>
+      🏦 Mantené siempre <strong>2–3 meses de gastos fijos</strong> como fondo<br>
+      📅 Retirá con <strong>periodicidad fija</strong> (mensual o quincenal)<br>
+      🔄 Reinvertí al menos el <strong>20%</strong> en stock e infraestructura
+    </div>
+    ${m.capitalPrestamos > 0 ? `
+    <div style="margin-top:12px;background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;font-size:.82rem">
+      <div style="font-weight:600;color:var(--brown2);margin-bottom:5px">🏦 Capital inyectado este período</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="color:var(--text2)">Préstamos recibidos</span>
+        <span style="font-weight:600;color:var(--ok)">${fmt(m.capitalPrestamos)}</span>
+      </div>
+      ${m.deudaPrestamos > 0 ? `<div style="display:flex;justify-content:space-between">
+        <span style="color:var(--text2)">Deuda pendiente total</span>
+        <span style="font-weight:600;color:var(--warn)">${fmt(m.deudaPrestamos)}</span>
+      </div>` : `<div style="color:var(--ok);font-size:.78rem">✓ Sin deuda pendiente</div>`}
+    </div>` : ''}
+  `;
+}
