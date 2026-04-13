@@ -889,6 +889,18 @@ let _gasUrl = localStorage.getItem('movil_gas_url') || '';
 let _pendiente = [];    // cambios sin subir a Drive
 let _lastSync  = null;  // timestamp último sync exitoso
 
+// Igual que nowISOLocal() en timezone.js de index.html:
+// genera ISO con offset local (ej: "2026-04-12T17:41:00-04:00") en lugar de UTC "Z"
+// para que el modal "Datos en Google Drive" muestre la misma hora en ambos lados
+function _nowISOLocal(){
+  const now = new Date();
+  const off = -now.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(off) % 60).padStart(2, '0');
+  return new Date(now.getTime() + off * 60000).toISOString().replace('Z', `${sign}${hh}:${mm}`);
+}
+
 // ══════════════════════════════════════════════
 //  INDEXEDDB — almacenamiento principal
 // ══════════════════════════════════════════════
@@ -953,7 +965,7 @@ async function sincronizar(){
     if(_pendiente.length > 0 && _data){
       _aplicarPendientes();
       // Marcar timestamp ANTES de subir: Drive y local quedan con el mismo ts
-      tsSubida = new Date().toISOString();
+      tsSubida = _nowISOLocal();
       const payload = Object.assign({}, _data, { _guardado: tsSubida, _version: 2 });
       const res = await fetch(_gasUrl, {
         method: 'POST',
@@ -1020,7 +1032,7 @@ async function subirADrive(){
     _aplicarPendientes();
     const payload = Object.assign({}, _data, {
       _version:  2,
-      _guardado: new Date().toISOString()
+      _guardado: _nowISOLocal()
     });
     const res = await fetch(_gasUrl, {
       method: 'POST',
@@ -1118,10 +1130,21 @@ async function _guardarPendiente(op){
 // ══════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════
+// Mapa entre nombre de colección y clave en nextId (igual que index.html / buildData)
+const _NEXTID_KEY_MAP = {
+  ventas: 'venta', pedidos: 'pedido', historialCompras: 'comp',
+  ingredientes: 'ing', proveedores: 'prov', recetas: 'rec', producciones: 'prod'
+};
 function _nextId(coleccion){
   if(!_data) return Date.now();
   const arr = _data[coleccion] || [];
-  return arr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
+  const newId = arr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
+  // Mantener _data.nextId actualizado para que index.html no detecte
+  // falsos conflictos al comparar el JSON completo contra Drive
+  if(!_data.nextId) _data.nextId = {};
+  const key = _NEXTID_KEY_MAP[coleccion];
+  if(key) _data.nextId[key] = Math.max(_data.nextId[key] || 0, newId + 1);
+  return newId;
 }
 
 function _stockColor(ing){

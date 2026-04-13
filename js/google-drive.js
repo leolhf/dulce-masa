@@ -164,9 +164,18 @@ function _gdriveDiff(local, drive){
   });
 
   if(!hasDiff){
-    const ljson = JSON.stringify({...local, _guardado:undefined, _version:undefined});
-    const djson = JSON.stringify({...drive, _guardado:undefined, _version:undefined});
-    if(ljson !== djson){ hasDiff = true; resumen.push('Diferencias en contenido de registros'); }
+    // Comparar solo las secciones de datos reales (excluir nextId y metadatos)
+    // para evitar falsos conflictos cuando movil.html no actualiza nextId
+    const DATA_KEYS = [
+      'ingredientes','recetas','producciones','ventas','pedidos',
+      'historialCompras','proveedores','stockProductos',
+      'catRecetas','gastosFijos','extracciones','prestamos','metas'
+    ];
+    const norm = obj => Object.fromEntries(DATA_KEYS.map(k => [k, obj[k] ?? []]));
+    if(JSON.stringify(norm(local)) !== JSON.stringify(norm(drive))){
+      hasDiff = true;
+      resumen.push('Diferencias en contenido de registros');
+    }
   }
 
   return { hasDiff, resumen, driveTs, localTs, filas };
