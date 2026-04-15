@@ -566,6 +566,10 @@ body {
     <span>⬇</span>
     <span>Instalar</span>
   </button>
+  <button class="sync-btn" onclick="deshacerUltimaAccion()" id="btn-deshacer" style="background:var(--danger-bg);margin-left:8px;opacity:0.5;cursor:not-allowed" disabled title="Deshacer última acción">
+    <span>↶</span>
+    <span>Deshacer</span>
+  </button>
 </div>
 
 <!-- CONTENT -->
@@ -1271,6 +1275,11 @@ async function registrarVentaMovil(){
   const id = _nextId('ventas');
   const venta = { id, fecha: today(), recetaId, unidades, precio, propina: 0, canal, nota };
 
+  // Guardar estado anterior para deshacer
+  const estadoAnterior = {
+    stockProducto: sp ? sp.stock : null
+  };
+
   // Aplicar localmente si hay cache
   if(_data){
     if(!_data.ventas) _data.ventas = [];
@@ -1280,6 +1289,9 @@ async function registrarVentaMovil(){
   }
 
   await _guardarPendiente({ type: 'venta', data: venta });
+  
+  // Guardar en historial para deshacer
+  guardarAccionParaDeshacer('venta', venta, estadoAnterior);
 
   // Limpiar formulario
   document.getElementById('v-prod').value = '';
@@ -1430,10 +1442,16 @@ async function registrarPedidoMovil(){
     ventaIds: []
   };
 
+  // Guardar estado anterior para deshacer (pedido nuevo no tiene estado anterior)
+  const estadoAnterior = {};
+
   if(!_data.pedidos) _data.pedidos = [];
   _data.pedidos.push(pedido);
   await _guardarCacheIDB();
   await _guardarPendiente({ type: 'nuevo_pedido', data: pedido });
+  
+  // Guardar en historial para deshacer
+  guardarAccionParaDeshacer('pedido', pedido, estadoAnterior);
 
   _mostrarFormPedido(false);
   renderPedidosMovil();
@@ -1516,6 +1534,14 @@ async function accionPedidoMovil(id, nuevoEstado){
   const p = (_data.pedidos||[]).find(pe => pe.id == id);
   if(!p) return;
 
+  // Guardar estado anterior para deshacer
+  const estadoAnterior = {
+    estado: p.estado,
+    fechaEntregaReal: p.fechaEntregaReal,
+    fechaCobro: p.fechaCobro,
+    ventaIds: p.ventaIds
+  };
+
   if(nuevoEstado === 'listo'){
     // Verificar stock
     const sinStock = [];
@@ -1558,6 +1584,9 @@ async function accionPedidoMovil(id, nuevoEstado){
   p.estado = nuevoEstado;
   await _guardarCacheIDB();
   await _guardarPendiente({ type: 'pedido_estado', id, estado: nuevoEstado, ventas: ventasGeneradas, fechaEntregaReal: p.fechaEntregaReal, fechaCobro: p.fechaCobro });
+
+  // Guardar en historial para deshacer
+  guardarAccionParaDeshacer('cambio_estado_pedido', { id, nuevoEstado }, estadoAnterior);
 
   const msgs = { listo: '✓ Pedido listo — stock descontado', entregado_sin_cobrar: '📦 Entregado — cobro pendiente', entregado: '💰 Cobrado — venta registrada' };
   toast(msgs[nuevoEstado] || 'Actualizado');
@@ -1777,18 +1806,27 @@ async function registrarCompraMovil(){
     toast(`✨ Proveedor "${provNombre}" creado`);
   }
 
+  // Guardar estado anterior para deshacer
+  const ing = (_data.ingredientes||[]).find(i => i.id == ingId);
+  const estadoAnterior = {
+    stockIngrediente: ing ? ing.stock : null,
+    precioIngrediente: ing ? ing.precio : null
+  };
+
   const id = _nextId('historialCompras');
   const compra = { id, ingId, qty, precio: precio||0, fecha: today(), provId: provId||null, notas };
 
   if(!_data.historialCompras) _data.historialCompras = [];
   _data.historialCompras.push(compra);
-  const ing = (_data.ingredientes||[]).find(i => i.id == ingId);
   if(ing){
     ing.stock = +(ing.stock + qty).toFixed(4);
     if(precio > 0) ing.precio = precio;
   }
   await _guardarCacheIDB();
   await _guardarPendiente({ type: 'compra', data: compra });
+  
+  // Guardar en historial para deshacer
+  guardarAccionParaDeshacer('compra', compra, estadoAnterior);
 
   // Limpiar formulario
   document.getElementById('c-ing-id').value  = '';
@@ -2000,6 +2038,236 @@ async function instalarPWA(){
   if(outcome === 'accepted') toast('✅ Instalando app…');
   _pwaPrompt = null;
 }
+
+// ══════════════════════════════════════════════
+//  SISTEMA DE DESHACER
+// ══════════════════════════════════════════════
+let _historialAcciones = [];
+const MAX_HISTORIAL = 20;
+const HISTORIAL_KEY = 'dulcemasa_historial_deshacer_movil';
+
+// Cargar historial desde localStorage al iniciar
+function _cargarHistorialDesdeStorage(){
+  try {
+    const guardado = localStorage.getItem(HISTORIAL_KEY);
+    if(guardado){
+      const parsed = JSON.parse(guardado);
+      // Limpiar acciones más antiguas de 24 horas
+      const ahora = Date.now();
+      _historialAcciones = parsed.filter(accion => (ahora - accion.timestamp) < 24 * 60 * 60 * 1000);
+      if(_historialAcciones.length !== parsed.length){
+        _guardarHistorialEnStorage(); // Limpiar el storage
+      }
+    }
+  } catch(e){
+    console.warn('Error al cargar historial desde storage:', e);
+    _historialAcciones = [];
+  }
+}
+
+function _guardarHistorialEnStorage(){
+  try {
+    localStorage.setItem(HISTORIAL_KEY, JSON.stringify(_historialAcciones));
+  } catch(e){
+    console.warn('Error al guardar historial en storage:', e);
+  }
+}
+
+function guardarAccionParaDeshacer(tipo, datos, estadoAnterior){
+  const accion = {
+    tipo,
+    datos,
+    estadoAnterior: JSON.parse(JSON.stringify(estadoAnterior)),
+    timestamp: Date.now()
+  };
+  
+  _historialAcciones.unshift(accion);
+  if(_historialAcciones.length > MAX_HISTORIAL){
+    _historialAcciones = _historialAcciones.slice(0, MAX_HISTORIAL);
+  }
+  
+  _guardarHistorialEnStorage();
+  actualizarBotonDeshacer();
+}
+
+function actualizarBotonDeshacer(){
+  const btn = document.getElementById('btn-deshacer');
+  if(btn){
+    if(_historialAcciones.length > 0){
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      const ultimaAccion = _historialAcciones[0];
+      const tiempo = Math.floor((Date.now() - ultimaAccion.timestamp) / 1000);
+      if(tiempo < 60){
+        btn.innerHTML = `<span>↶</span><span>Deshacer (${tiempo}s)</span>`;
+      } else {
+        btn.innerHTML = `<span>↶</span><span>Deshacer</span>`;
+      }
+    } else {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+      btn.innerHTML = `<span>↶</span><span>Deshacer</span>`;
+    }
+  }
+}
+
+async function deshacerUltimaAccion(){
+  if(_historialAcciones.length === 0){
+    toast('⚠ No hay acciones para deshacer');
+    return;
+  }
+  
+  const accion = _historialAcciones.shift();
+  
+  try {
+    switch(accion.tipo){
+      case 'venta':
+        await deshacerVenta(accion);
+        break;
+      case 'pedido':
+        await deshacerPedido(accion);
+        break;
+      case 'compra':
+        await deshacerCompra(accion);
+        break;
+      case 'cambio_estado_pedido':
+        await deshacerCambioEstadoPedido(accion);
+        break;
+      default:
+        toast('⚠ Tipo de acción no reconocida');
+        return;
+    }
+    
+    toast('✅ Acción deshecha correctamente');
+    _guardarHistorialEnStorage(); // Guardar historial actualizado
+    actualizarBotonDeshacer();
+    
+    // Actualizar la vista actual
+    if(_seccion === 'inicio') renderInicio();
+    if(_seccion === 'ventas') renderVentasMovil();
+    if(_seccion === 'pedidos') renderPedidosMovil();
+    if(_seccion === 'compras') renderComprasMovil();
+    if(_seccion === 'stock') renderStockMovil();
+    
+  } catch(error){
+    console.error('Error al deshacer acción:', error);
+    toast('⚠ Error al deshacer la acción');
+    // Revertir el historial
+    _historialAcciones.unshift(accion);
+    actualizarBotonDeshacer();
+  }
+}
+
+async function deshacerVenta(accion){
+  const venta = accion.datos;
+  
+  // Eliminar del array de ventas
+  if(_data && _data.ventas){
+    const index = _data.ventas.findIndex(v => v.id === venta.id);
+    if(index !== -1){
+      _data.ventas.splice(index, 1);
+    }
+  }
+  
+  // Eliminar de pendientes
+  const pendIndex = _pendiente.findIndex(p => p.type === 'venta' && p.data.id === venta.id);
+  if(pendIndex !== -1){
+    _pendiente.splice(pendIndex, 1);
+  }
+  
+  // Restaurar stock
+  const sp = _stockProd(venta.recetaId);
+  if(sp){
+    sp.stock = accion.estadoAnterior.stockProducto || (sp.stock + venta.unidades);
+  }
+  
+  await _guardarCacheIDB();
+  await _guardarPendientesLocal();
+}
+
+async function deshacerPedido(accion){
+  const pedido = accion.datos;
+  
+  // Eliminar del array de pedidos
+  if(_data && _data.pedidos){
+    const index = _data.pedidos.findIndex(p => p.id === pedido.id);
+    if(index !== -1){
+      _data.pedidos.splice(index, 1);
+    }
+  }
+  
+  // Eliminar de pendientes
+  const pendIndex = _pendiente.findIndex(p => p.type === 'nuevo_pedido' && p.data.id === pedido.id);
+  if(pendIndex !== -1){
+    _pendiente.splice(pendIndex, 1);
+  }
+  
+  await _guardarCacheIDB();
+  await _guardarPendientesLocal();
+}
+
+async function deshacerCompra(accion){
+  const compra = accion.datos;
+  
+  // Eliminar del array de compras
+  if(_data && _data.historialCompras){
+    const index = _data.historialCompras.findIndex(c => c.id === compra.id);
+    if(index !== -1){
+      _data.historialCompras.splice(index, 1);
+    }
+  }
+  
+  // Eliminar de pendientes
+  const pendIndex = _pendiente.findIndex(p => p.type === 'compra' && p.data.id === compra.id);
+  if(pendIndex !== -1){
+    _pendiente.splice(pendIndex, 1);
+  }
+  
+  // Restaurar stock del ingrediente
+  const ing = (_data.ingredientes||[]).find(i => i.id == compra.ingId);
+  if(ing){
+    ing.stock = accion.estadoAnterior.stockIngrediente || Math.max(0, ing.stock - compra.qty);
+  }
+  
+  await _guardarCacheIDB();
+  await _guardarPendientesLocal();
+}
+
+async function deshacerCambioEstadoPedido(accion){
+  const pedido = _data.pedidos.find(p => p.id === accion.datos.id);
+  if(pedido){
+    pedido.estado = accion.estadoAnterior.estado;
+    if(accion.estadoAnterior.fechaEntregaReal !== undefined){
+      pedido.fechaEntregaReal = accion.estadoAnterior.fechaEntregaReal;
+    }
+    if(accion.estadoAnterior.fechaCobro !== undefined){
+      pedido.fechaCobro = accion.estadoAnterior.fechaCobro;
+    }
+    if(accion.estadoAnterior.ventaIds !== undefined){
+      pedido.ventaIds = accion.estadoAnterior.ventaIds;
+    }
+    
+    await _guardarCacheIDB();
+  }
+}
+
+// Actualizar el botón de deshacer cada 30 segundos
+setInterval(actualizarBotonDeshacer, 30000);
+
+// Inicializar el historial cuando el DOM esté listo
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', function(){
+    _cargarHistorialDesdeStorage();
+    actualizarBotonDeshacer();
+  });
+} else {
+  // El DOM ya está cargado
+  _cargarHistorialDesdeStorage();
+  actualizarBotonDeshacer();
+}
+
 </script>
 </body>
 </html>

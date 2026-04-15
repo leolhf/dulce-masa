@@ -94,7 +94,11 @@ function guardarGastoFijo(){
     if(g){ g.nombre=nombre; g.monto=monto; g.periodo=periodo; }
   } else {
     const maxId = gastosFijos.reduce((a,g)=>Math.max(a,g.id),0);
-    gastosFijos.push({ id:maxId+1, nombre, monto, periodo });
+    const _gastoNuevo = { id:maxId+1, nombre, monto, periodo };
+    gastosFijos.push(_gastoNuevo);
+    if(typeof guardarAccionParaDeshacer === 'function'){
+      guardarAccionParaDeshacer('gasto_fijo', _gastoNuevo, { esNuevo: true, valoresAnteriores: null });
+    }
   }
   _gastoFijoEditId = null;
   closeModal('modal-gasto-fijo');
@@ -105,8 +109,6 @@ function guardarGastoFijo(){
 function eliminarGastoFijo(id){
   confirmar({ titulo:'Eliminar gasto fijo', labelOk:'Eliminar', tipo:'danger',
     onOk:()=>{ gastosFijos=(gastosFijos||[]).filter(g=>g.id!==id); saveData();renderCostos();toast('Eliminado'); }
-  }); return;
-  gastosFijos = (gastosFijos||[]).filter(g=>g.id!==id);
-  saveData(); renderCostos(); toast('Eliminado');
+  });
 }
 

@@ -12,13 +12,79 @@ class CapitalAdjustment {
     localStorage.setItem('capital_ajustes', JSON.stringify(data));
   }
   
-  // Obtener capital ajustado actual
-  static getCapitalAjustado() {
+  // Reparar ajustes existentes que no tienen capitalFinal
+  static repararAjustesExistentes() {
     const ajustes = this.ajustes;
+    let reparados = 0;
+    
+    ajustes.forEach(ajuste => {
+      if (ajuste.capitalFinal === undefined && ajuste.capitalReal !== undefined) {
+        ajuste.capitalFinal = ajuste.capitalReal;
+        reparados++;
+      }
+    });
+    
+    if (reparados > 0) {
+      this.ajustes = ajustes;
+      console.log(`[CapitalAdjustment] Reparados ${reparados} ajustes con capitalFinal faltante`);
+      if (typeof saveData === 'function') {
+        saveData();
+      }
+    }
+    
+    return reparados;
+  }
+
+  // Obtener capital ajustado actual (dinámico)
+  static getCapitalAjustado() {
+    // Primero reparar ajustes si es necesario
+    this.repararAjustesExistentes();
+    
+    const ajustes = this.ajustes;
+    console.log('[CapitalAdjustment] Ajustes totales:', ajustes.length);
+    console.log('[CapitalAdjustment] Estados de ajustes:', ajustes.map(a => ({ id: a.id, estado: a.estado, capitalFinal: a.capitalFinal })));
+    
     if (ajustes.length === 0) return null;
     
-    const ultimoAjuste = ajustes[ajustes.length - 1];
-    return ultimoAjuste.capitalFinal;
+    // Filtrar solo ajustes activos
+    const ajustesActivos = ajustes.filter(a => a.estado === 'activo');
+    console.log('[CapitalAdjustment] Ajustes activos:', ajustesActivos.length);
+    
+    if (ajustesActivos.length === 0) return null;
+    
+    const ultimoAjuste = ajustesActivos[ajustesActivos.length - 1];
+    console.log('[CapitalAdjustment] Último ajuste activo:', ultimoAjuste);
+    
+    // Calcular capital dinámicamente basado en el ajuste manual + operaciones recientes
+    const capitalAjustadoDinamico = this._calcularCapitalAjustadoDinamico(ultimoAjuste);
+    console.log('[CapitalAdjustment] capital ajustado dinámico:', capitalAjustadoDinamico);
+    return capitalAjustadoDinamico;
+  }
+
+  // Calcular capital ajustado dinámicamente
+  static _calcularCapitalAjustadoDinamico(ultimoAjuste) {
+    try {
+      // Obtener métricas actuales calculadas
+      if (typeof _finMetricas === 'function') {
+        const m = _finMetricas('todo');
+        console.log('[CapitalAdjustment] Métricas actuales:', m);
+        
+        // Calcular la diferencia entre el capital ajustado original y el calculado en ese momento
+        const diferenciaAjuste = ultimoAjuste.capitalReal - ultimoAjuste.capitalCalculado;
+        console.log('[CapitalAdjustment] Diferencia del ajuste original:', diferenciaAjuste);
+        
+        // Aplicar la misma diferencia al capital calculado actual
+        const capitalActualConAjuste = m.capitalTotal + diferenciaAjuste;
+        console.log('[CapitalAdjustment] Capital actual con ajuste aplicado:', capitalActualConAjuste);
+        
+        return capitalActualConAjuste;
+      }
+    } catch (error) {
+      console.warn('[CapitalAdjustment] Error al calcular capital ajustado dinámico:', error);
+    }
+    
+    // Fallback al valor estático original
+    return ultimoAjuste.capitalReal;
   }
   
   // Realizar ajuste de capital
@@ -34,6 +100,7 @@ class CapitalAdjustment {
       fecha: new Date().toISOString(),
       capitalCalculado,
       capitalReal,
+      capitalFinal: capitalReal, // El capital final es el capital real ajustado
       diferencia: capitalReal - capitalCalculado,
       motivo: motivo.trim(),
       usuario,
@@ -45,6 +112,11 @@ class CapitalAdjustment {
     const ajustes = this.ajustes;
     ajustes.push(ajuste);
     this.ajustes = ajustes;
+    
+    // Guardar datos permanentemente
+    if (typeof saveData === 'function') {
+      saveData();
+    }
     
     // Actualizar capital en tiempo real
     this._actualizarCapitalEnUI(capitalReal);
@@ -91,11 +163,20 @@ class CapitalAdjustment {
   
   // Actualizar capital en la UI
   static _actualizarCapitalEnUI(capitalReal) {
-    // Actualizar KPIs principales
-    updateElement('kpi-capital-total', fmt(capitalReal));
+    // Actualizar resumen ejecutivo (capital histórico)
+    const resumenCapital = document.getElementById('resumen-capital-total');
+    if (resumenCapital) resumenCapital.textContent = fmt(capitalReal);
+    const resumenDet = document.getElementById('resumen-capital-total-det');
+    if (resumenDet) resumenDet.textContent = '✏️ Ajustado manualmente';
     
-    // Actualizar resumen ejecutivo
-    updateElement('resumen-capital', fmt(capitalReal));
+    // Actualizar color de la tarjeta según valor
+    const tarjeta = document.getElementById('resumen-capital-total-card');
+    if (tarjeta) {
+      tarjeta.style.background = capitalReal >= 0 ? 'var(--ok-bg)' : 'var(--danger-bg)';
+      tarjeta.style.borderColor = capitalReal >= 0 ? 'var(--ok)' : 'var(--danger)';
+      const valEl = tarjeta.querySelector('.resumen-capital-valor');
+      if (valEl) valEl.style.color = capitalReal >= 0 ? 'var(--ok)' : 'var(--danger)';
+    }
     
     // Actualizar tarjeta de estadísticas
     const statsCard = document.querySelector('.stat-card:nth-child(2) .stat-value');
@@ -126,7 +207,7 @@ class CapitalAdjustment {
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         animation: slideIn 0.3s ease;
       `;
-      document.body.appendChild(indador);
+      document.body.appendChild(indicador);
     }
     
     indicador.textContent = 'Capital ajustado manualmente';

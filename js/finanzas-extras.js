@@ -126,20 +126,10 @@ function _renderComparativaMes() {
   updEl('resumen-ingresos-det',   `${mAct.nVentas} ventas ${_badge(_diff(mAct.ingresosTotal, mAnt.ingresosTotal))}`);
   updEl('resumen-gastos-det',     `${fmt(mAct.costoCompras)} compras + ${fmt(mAct.costosVariables + mAct.gastosFijosMes)} op. ${_badge(_diff(mAct.gastosTotales, mAnt.gastosTotales), true)}`);
   updEl('resumen-disponible-det', `Para retiros ${_badge(_diff(mAct.disponible, mAnt.disponible))}`);
+  updEl('resumen-capital-total-det', `Efectivo + Préstamos ${_badge(_diff(mAct.capitalTotal, mAnt.capitalTotal))}`);
 }
 
 // ─────────────────────────────────────────────────────
-// HOOK: extender renderFinanzas para incluir las extras
-// Se llama al final de la función principal
+// EXTRAS: funciones de renderizado para finanzas
+// Estas funciones se llaman directamente desde renderFinanzas() en finanzas-kpi.js
 // ─────────────────────────────────────────────────────
-const _renderFinanzasOriginal = typeof renderFinanzas === 'function' ? renderFinanzas : null;
-
-function renderFinanzasConExtras() {
-  if (_renderFinanzasOriginal) _renderFinanzasOriginal();
-  // Extras
-  _renderSaludFinanciera();
-  _renderSemanaFinanciera();
-  _renderComparativaMes();
-  // Refrescar metas si el tab está visible
-  if (document.getElementById('fin-tab-metas')?.classList.contains('active')) renderMetas();
-}

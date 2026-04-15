@@ -8,14 +8,13 @@ function goto(sec,el){
   curSection=sec;
   const tr=$('topbar-right');
   let btns='';
-  if(sec==='dashboard') btns=`<button class="btn btn-secondary btn-sm" onclick="importarDesdeJSON()" title="Cargar datos desde archivo JSON">📂 Importar</button>`;
+  if(sec==='dashboard') btns+=`<button class="btn btn-secondary btn-sm" onclick="importarDesdeJSON()" title="Cargar datos desde archivo JSON">📂 Importar</button>`;
   if(EXPORTS.includes(sec)) btns+=`<button class="btn btn-secondary btn-sm" onclick="exportCSV()" title="Exportar a CSV">↓ CSV</button>`;
-  // Conservar botón PWA si está visible
+  // Botón PWA — se conserva si está disponible
   const pwaVisible = _pwaPrompt !== null;
   btns += `<button id="btn-pwa-install" onclick="pwaInstall()" style="display:${pwaVisible?'inline-flex':'none'};align-items:center;gap:5px;background:rgba(196,124,43,.15);color:var(--caramel);border:1px solid rgba(196,124,43,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">⬇ Instalar app</button>`;
   tr.innerHTML=btns;
   render(sec);
-  // Cerrar sidebar en móvil al navegar
   if(window.innerWidth<=768) closeSidebar();
 }
 
@@ -24,9 +23,6 @@ function render(sec){
   updateAlertBadge();
 }
 
-
-// ── Sidebar móvil ──
-// (movidas desde google-drive.js donde no tenían relación con Drive)
 function toggleSidebar(){
   const sb = document.querySelector('.sidebar');
   const ov = document.getElementById('sidebar-overlay');

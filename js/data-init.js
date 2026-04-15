@@ -20,6 +20,7 @@ async function initializeData(){
   const DEF={
     ingredientes:[],recetas:[],producciones:[],ventas:[],pedidos:[],
     stockProductos:[],proveedores:[],historialCompras:[],extracciones:[],
+    capital_ajustes: [],  // Agregar ajustes de capital
     nextId:{ing:1,rec:1,prod:1,venta:1,prov:1,comp:1,pedido:1,ext:1}
   };
 
@@ -52,6 +53,9 @@ async function initializeData(){
           stockProductos:data.stockProductos||DEF.stockProductos,
           proveedores:data.proveedores||DEF.proveedores,
           historialCompras:data.historialCompras||DEF.historialCompras,
+          prestamos:data.prestamos||DEF.prestamos,
+          gastosFijos:data.gastosFijos||DEF.gastosFijos,
+          metas:data.metas||DEF.metas,
           nextId:data.nextId||DEF.nextId
         };
         await dbSet(db, 'reposteria_data', saved);
@@ -69,6 +73,7 @@ async function initializeData(){
       stockProductos  = saved.stockProductos  ||DEF.stockProductos;
       proveedores     = saved.proveedores     ||DEF.proveedores;
       historialCompras= saved.historialCompras||DEF.historialCompras;
+      capital_ajustes = saved.capital_ajustes || DEF.capital_ajustes;  // Cargar ajustes de capital
       nextId          = saved.nextId          ||DEF.nextId;
       if(saved.catRecetas&&Array.isArray(saved.catRecetas)&&saved.catRecetas.length>0) catRecetas=saved.catRecetas;
       if(saved.gastosFijos&&Array.isArray(saved.gastosFijos))   gastosFijos=saved.gastosFijos;
@@ -79,6 +84,7 @@ async function initializeData(){
       ingredientes=DEF.ingredientes; recetas=DEF.recetas; producciones=DEF.producciones;
       ventas=DEF.ventas; pedidos=DEF.pedidos; stockProductos=DEF.stockProductos;
       proveedores=DEF.proveedores; historialCompras=DEF.historialCompras; nextId=DEF.nextId;
+      capital_ajustes = DEF.capital_ajustes;  // Cargar ajustes de capital por defecto
     }
   }catch(e){
     console.error('Error cargando datos desde IndexedDB:', e);
@@ -220,19 +226,39 @@ function calcCosto(r,tandas=1){
 }
 
 function obtenerPrecioPromedioIngrediente(ingId) {
-  if (!historialCompras || historialCompras.length === 0) return 0;
+  const tipoPrecio = $('inv-precio-tipo')?.value || 'fijo';
+  const ingrediente = ingredientes.find(i => i.id == ingId);
   
-  // Filtrar compras de este ingrediente
-  // Comparación laxa para tolerar ingId como string o número (bug histórico)
-  const comprasIngrediente = historialCompras.filter(c => c.ingId == ingId);
-  
-  if (comprasIngrediente.length === 0) return 0;
-  
-  // Calcular precio promedio ponderado
-  const totalCantidad = comprasIngrediente.reduce((a, c) => a + c.qty, 0);
-  const totalMonto = comprasIngrediente.reduce((a, c) => a + c.qty * c.precio, 0);
-  
-  return totalCantidad > 0 ? totalMonto / totalCantidad : 0;
+  switch(tipoPrecio) {
+    case 'fijo':
+      // Usar precio fijo del inventario
+      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
+      
+    case 'promedio':
+      // Usar precio promedio del historial de compras
+      if (!historialCompras || historialCompras.length === 0) return 0;
+      const comprasPromedio = historialCompras.filter(c => c.ingId == ingId);
+      if (comprasPromedio.length === 0) return 0;
+      const totalCantidad = comprasPromedio.reduce((a, c) => a + c.qty, 0);
+      const totalMonto = comprasPromedio.reduce((a, c) => {
+        if (c.total !== undefined && c.total !== null) {
+          return a + c.total;
+        }
+        return a + (c.qty * c.precio);
+      }, 0);
+      return totalCantidad > 0 ? totalMonto / totalCantidad : 0;
+      
+    case 'ultimo':
+      // Usar precio de la última compra
+      if (!historialCompras || historialCompras.length === 0) return 0;
+      const comprasUltimo = historialCompras.filter(c => c.ingId == ingId);
+      if (comprasUltimo.length === 0) return 0;
+      const ultimaCompra = comprasUltimo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+      return ultimaCompra ? ultimaCompra.precio : 0;
+      
+    default:
+      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
+  }
 }
 function canProduce(r,tandas=1){
   return r.ings.every(ri=>{const i=ing(ri.ingId);return i&&i.stock>=ri.qty*tandas;});

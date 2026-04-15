@@ -29,6 +29,19 @@ function borrarTodo() {
     prestamos     = [];
     extracciones  = [];
     proveedores   = [];
+    
+    // Borrar ajustes manuales de capital
+    if (typeof CapitalAdjustment !== 'undefined') {
+      CapitalAdjustment.ajustes = [];
+      console.log('[Borrar Todo] Ajustes de capital eliminados');
+    }
+    
+    // Borrar historial de deshacer
+    if (typeof _historial !== 'undefined') {
+      _historial = [];
+    }
+    localStorage.removeItem('dulcemasa_historial_deshacer');
+    localStorage.removeItem('capital_ajustes');
 
     saveData();
 

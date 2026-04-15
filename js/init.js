@@ -118,6 +118,7 @@ function buildData(){
     _guardado: nowISOLocal(),  // timezone.js — ISO con offset local, no UTC
     ingredientes, recetas, producciones, ventas, pedidos,
     stockProductos, proveedores, historialCompras, catRecetas, gastosFijos, extracciones, prestamos, metas,
+    capital_ajustes: CapitalAdjustment.ajustes,  // Agregar ajustes de capital
     nextId:{
       ing:nextId?.ing||1, rec:nextId?.rec||1, prod:nextId?.prod||1,
       venta:nextId?.venta||1, comp:nextId?.comp||1,

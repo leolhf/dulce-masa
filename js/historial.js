@@ -319,8 +319,20 @@ function guardarCompra(){
       toast('Compra actualizada correctamente');
     }
   } else {
+    // Guardar estado anterior para deshacer
+    const estadoAnterior = {
+      stockIngrediente: ingrediente ? ingrediente.stock : null,
+      precioIngrediente: ingrediente ? ingrediente.precio : null
+    };
+    
     // Nueva compra
     historialCompras.push(compraData);
+    
+    // Guardar en historial para deshacer
+    if(typeof guardarAccionParaDeshacer === 'function'){
+      guardarAccionParaDeshacer('compra', compraData, estadoAnterior);
+    }
+    
     toast('Compra registrada correctamente');
   }
   
@@ -333,6 +345,7 @@ function guardarCompra(){
   // Cerrar modal y actualizar vistas
   closeModal('modal-compra');
   renderHistorial();
+  renderFinanzas();
   saveData();
   
   // Limpiar formulario
@@ -360,6 +373,7 @@ function delCompra(id){
   // Guardar cambios y actualizar vista
   saveData();
   renderHistorial();
+  renderFinanzas();
   
   toast('Compra eliminada correctamente');
 }

@@ -32,7 +32,7 @@ async function pwaInstall(){
 }
 
 // ── Registro de funciones de render para el paginador ──
-_pagRenderFns.ventas  = renderVentasTable;
-_pagRenderFns.hist    = renderHistorial;
-_pagRenderFns.pedidos = renderPedidosTable;
+_pagRenderFns.ventas  = typeof renderVentasTable === 'function' ? renderVentasTable : null;
+_pagRenderFns.hist    = typeof renderHistorial === 'function' ? renderHistorial : null;
+_pagRenderFns.pedidos = typeof renderPedidosTable === 'function' ? renderPedidosTable : null;
 

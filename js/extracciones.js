@@ -78,13 +78,18 @@ function registrarExtraccion(){
 
   if (editId){
     const e = extracciones.find(x => x.id === editId);
-    if (e) Object.assign(e, { fecha, tipo, monto, concepto, periodo });
+    if (e) Object.assign(e, { fecha, tipo, monto, concepto });
     $('ext-edit-id').value = '';
     $('ext-btn-guardar').textContent = '💵 Registrar retiro';
     $('ext-btn-cancelar').style.display = 'none';
     toast('Retiro actualizado ✓');
   } else {
-    extracciones.push({ id: nextId.ext++, fecha, tipo, monto, concepto, periodo });
+    const _extNueva = { id: nextId.ext++, fecha, tipo, monto, concepto };
+    const _capitalAntesExt = typeof data !== 'undefined' && data.capital !== undefined ? data.capital : undefined;
+    extracciones.push(_extNueva);
+    if(typeof guardarAccionParaDeshacer === 'function'){
+      guardarAccionParaDeshacer('extraccion', _extNueva, { capital: _capitalAntesExt });
+    }
     toast('💵 Retiro registrado ✓');
   }
 

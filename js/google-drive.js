@@ -490,6 +490,7 @@ function _gdriveActualizarUI(conectado, msg){
     nombre.textContent   = msg ? '☁ ' + msg : '☁ Listo';
     
     // Mostrar estado de sincronización
+    const syncStatus = document.getElementById('sync-status');
     if(syncStatus){
       syncStatus.style.display = 'block';
       if(_syncStatus === 'synced'){

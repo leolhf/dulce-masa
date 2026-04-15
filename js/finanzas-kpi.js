@@ -8,7 +8,7 @@ function _finRango(periodo){
   let desde, hasta;
   if (periodo === 'semana'){
     desde = createDate(rangoUltimosDias(7)[0]);
-    hasta = finMes(0);
+    hasta = finDia(0);
   } else if (periodo === 'mes_actual'){
     desde = inicioMes(0);
     hasta = finMes(0);
@@ -45,10 +45,38 @@ function _finMetricas(periodo){
     return a + (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
   }, 0);
 
+  // Calcular cuántos meses abarca el período
+  let mesesEnPeriodo = 1;
+  if (periodo === 'mes_actual' || periodo === 'mes_anterior') {
+    mesesEnPeriodo = 1;
+  } else if (periodo === '3meses') {
+    mesesEnPeriodo = 3;
+  } else if (periodo === 'todo') {
+    // Calcular meses desde la fecha más antigua hasta hoy
+    let fechaMasAntigua = new Date();
+    if (ventas && ventas.length > 0) {
+      const primeraVenta = ventas.reduce((min, v) => {
+        const fechaVenta = createDate(v.fecha);
+        return fechaVenta < min ? fechaVenta : min;
+      }, createDate(ventas[0].fecha));
+      fechaMasAntigua = primeraVenta < fechaMasAntigua ? primeraVenta : fechaMasAntigua;
+    }
+    if (historialCompras && historialCompras.length > 0) {
+      const primeraCompra = historialCompras.reduce((min, c) => {
+        const fechaCompra = createDate(c.fecha);
+        return fechaCompra < min ? fechaCompra : min;
+      }, createDate(historialCompras[0].fecha));
+      fechaMasAntigua = primeraCompra < fechaMasAntigua ? primeraCompra : fechaMasAntigua;
+    }
+    const hoy = finMes(0);
+    const mesesTotales = Math.max(1, Math.ceil((hoy - fechaMasAntigua) / (1000 * 60 * 60 * 24 * 30)));
+    mesesEnPeriodo = mesesTotales;
+  }
+
   const gastosFijosMes = gastosFijos.reduce((a,g) => {
-    if (g.periodo === 'mensual') return a + g.monto;
-    if (g.periodo === 'semanal') return a + g.monto * 4.33;
-    if (g.periodo === 'anual')   return a + g.monto / 12;
+    if (g.periodo === 'mensual') return a + g.monto * mesesEnPeriodo;
+    if (g.periodo === 'semanal') return a + g.monto * 4.33 * mesesEnPeriodo;
+    if (g.periodo === 'anual')   return a + (g.monto / 12) * mesesEnPeriodo;
     return a;
   }, 0);
 
@@ -74,7 +102,8 @@ function _finMetricas(periodo){
   const saldoLibre        = disponible - totalExtraido;
   // CORRECCIÓN: Eliminamos prestamosConDevolución del efectivo operativo para evitar doble conteo
   const efectivoOperativo = ingresosTotal - gastosTotales - totalExtraido;
-  const capitalTotal      = efectivoOperativo + prestamosSinDevolucion + prestamosConDevolucion;
+  // Los préstamos con devolución ya están siendo devueltos (saldados), por lo que no se suman al capital total
+  const capitalTotal      = efectivoOperativo + prestamosSinDevolucion;
 
   return {
     ingresosBrutos, totalPropinas, ingresosTotal,
@@ -89,18 +118,8 @@ function _finMetricas(periodo){
   };
 }
 
-// ── Toggle detalles KPI ──
-function toggleKPIDetails(){
-  const content = $('kpi-details-content');
-  const button  = $('toggle-kpi-btn');
-  if (content.style.display === 'none'){
-    content.style.display = 'block';
-    button.textContent = '📉 Ocultar detalles';
-  } else {
-    content.style.display = 'none';
-    button.textContent = '📊 Ver detalles';
-  }
-}
+// ──// Toggle detalles KPI (eliminado - los Indicadores Detallados fueron removidos)
+// La función toggleKPIDetails() ha sido eliminada para simplificar la interfaz
 
 // ── Fila de resumen financiero ──
 function _finFila(label, valor, tipo, negativo = false){
@@ -121,18 +140,8 @@ function renderFinanzas(){
   const updateElement = (id, content) => { const el = $(id); if (el) el.textContent = content; };
   const updateHTML    = (id, content) => { const el = $(id); if (el) el.innerHTML   = content; };
 
-  // KPIs superiores
-  updateElement('kpi-efectivo-operativo', fmt(m.efectivoOperativo));
-  updateElement('kpi-efectivo-operativo-detalle', `${fmt(m.ingresosTotal)} - ${fmt(m.gastosTotales)} - ${fmt(m.totalExtraido)}`);
-  updateElement('kpi-capital-total', fmt(m.capitalTotal));
-  updateElement('kpi-capital-total-detalle', `${fmt(m.efectivoOperativo)} + ${fmt(m.prestamosSinDevolucion)} + ${fmt(m.prestamosConDevolucion)}`);
-  updateElement('kpi-ingresos', fmt(m.ingresosTotal));
-  updateElement('kpi-ingresos-detalle', `${fmt(m.ingresosBrutos)} ventas + ${fmt(m.totalPropinas)} propinas`);
-  updateElement('kpi-gastos', fmt(m.gastosTotales));
-  updateElement('kpi-gastos-detalle', `${fmt(m.costosVariables)} costos + ${fmt(m.gastosFijosMes)} fijos + ${fmt(m.costoCompras)} compras`);
-  updateElement('kpi-flujo', fmt(m.flujoBruto));
-  updateElement('kpi-saldo', fmt(m.saldoLibre));
-  updateElement('kpi-saldo-detalle', `Disponible - ya retirado (${fmt(m.totalExtraido)})`);
+  // KPIs superiores (eliminados - se muestran en el Resumen del Período)
+  // Los KPIs detallados han sido eliminados para simplificar la interfaz
 
   // Resumen ejecutivo
   updateElement('resumen-ingresos', fmt(m.ingresosTotal));
@@ -142,6 +151,53 @@ function renderFinanzas(){
   updateElement('resumen-flujo', fmt(m.flujoBruto));
   updateElement('resumen-disponible', fmt(m.disponible));
   updateElement('resumen-disponible-det', `Para retiros`);
+
+  // Capital total histórico (todo el historial, sin filtro de período)
+  // Reutilizar m si el período ya es 'todo' para evitar cálculo duplicado
+  const mTodo = periodo === 'todo' ? m : _finMetricas('todo');
+  console.log('[Finanzas KPI] mTodo:', mTodo, 'periodo:', periodo);
+  console.log('[Finanzas KPI] mTodo.capitalTotal:', mTodo?.capitalTotal, 'typeof:', typeof mTodo?.capitalTotal);
+  // Aplicar ajuste manual si existe
+  let capitalAjustado = null;
+  if (typeof CapitalAdjustment !== 'undefined') {
+    capitalAjustado = CapitalAdjustment.getCapitalAjustado();
+    console.log('[Finanzas KPI] CapitalAdjustment encontrado, capitalAjustado:', capitalAjustado);
+    console.log('[Finanzas KPI] typeof capitalAjustado:', typeof capitalAjustado);
+    console.log('[Finanzas KPI] Ajustes guardados:', CapitalAdjustment.ajustes);
+  } else {
+    console.log('[Finanzas KPI] CapitalAdjustment no encontrado');
+  }
+  // Verificación robusta del capital total
+  let capitalHistorico = 0;
+  if (capitalAjustado !== null) {
+    console.warn('[Finanzas KPI] AJUSTE MANUAL ACTIVO - Usando capital ajustado:', capitalAjustado);
+    console.warn('[Finanzas KPI] mTodo.capitalTotal calculado sería:', mTodo?.capitalTotal);
+    capitalHistorico = capitalAjustado;
+  } else if (mTodo && typeof mTodo.capitalTotal === 'number' && !isNaN(mTodo.capitalTotal)) {
+    console.log('[Finanzas KPI] Usando capitalTotal calculado:', mTodo.capitalTotal);
+    capitalHistorico = mTodo.capitalTotal;
+  } else {
+    // Calcular manualmente si mTodo.capitalTotal es inválido
+    console.warn('[Finanzas KPI] mTodo.capitalTotal inválido, calculando manualmente');
+    const efectivoOp = (mTodo?.ingresosTotal || 0) - (mTodo?.gastosTotales || 0) - (mTodo?.totalExtraido || 0);
+    const prestamosSinDev = mTodo?.prestamosSinDevolucion || 0;
+    capitalHistorico = efectivoOp + prestamosSinDev;
+    console.log('[Finanzas KPI] Capital calculado manualmente:', capitalHistorico);
+  }
+  console.log('[Finanzas KPI] capitalHistorico FINAL:', capitalHistorico, 'capitalAjustado:', capitalAjustado);
+  const tieneAjuste = capitalAjustado !== null;
+  updateElement('resumen-capital-total', fmt(capitalHistorico));
+  updateElement('resumen-capital-total-det', tieneAjuste ? '✏️ Ajustado manualmente' : `Efectivo + Préstamos`);
+  // Color dinámico en la tarjeta
+  const tarjCapital = document.getElementById('resumen-capital-total-card');
+  if (tarjCapital) {
+    tarjCapital.style.background = capitalHistorico >= 0 ? 'var(--ok-bg)' : 'var(--danger-bg)';
+    tarjCapital.style.borderColor = capitalHistorico >= 0 ? 'var(--ok)' : 'var(--danger)';
+    const valEl = tarjCapital.querySelector('.resumen-capital-valor');
+    if (valEl) valEl.style.color = capitalHistorico >= 0 ? 'var(--ok)' : 'var(--danger)';
+  }
+  // Exponer para Ajuste Capital
+  window._capitalHistoricoActual = mTodo.capitalTotal;
 
   const textos = { mes_actual:'Este mes', mes_anterior:'Mes anterior', '3meses':'Últimos 3 meses', todo:'Todo el historial' };
   updateElement('periodo-badge', textos[periodo] || 'Este mes');

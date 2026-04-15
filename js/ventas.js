@@ -217,9 +217,22 @@ function registrarVenta(){
     const sp=stockProd(recetaId);
     const stockDisponible=sp?sp.stock:0;
     if(unidades>stockDisponible){toast(`Stock insuficiente. Solo hay ${stockDisponible} unidades disponibles`);return;}
+    
+    // Guardar estado anterior para deshacer
+    const estadoAnterior = {
+      stockProducto: sp ? sp.stock : null
+    };
+    
     if(!ventas)ventas=[];
-    ventas.push({id:nextId.venta++,fecha,recetaId,unidades,precio,propina,canal,nota});
+    const venta={id:nextId.venta++,fecha,recetaId,unidades,precio,propina,canal,nota};
+    ventas.push(venta);
     if(sp)sp.stock-=unidades;
+    
+    // Guardar en historial para deshacer
+    if(typeof guardarAccionParaDeshacer === 'function'){
+      guardarAccionParaDeshacer('venta', venta, estadoAnterior);
+    }
+    
     $('venta-prod').value='';$('venta-unidades').value=1;$('venta-precio').value='';$('venta-nota').value='';$('venta-canal').value='';
     calcVenta();renderVentas();refreshAllStockViews();renderFinanzas();saveData();toast('Venta registrada ✓');
   }

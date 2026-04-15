@@ -30,6 +30,14 @@ function showFinanzasTab(tabName) {
     renderRentabilidad();
   } else if (tabName === 'metas') {
     renderMetas();
+  } else if (tabName === 'ajuste-capital') {
+    // Cargar datos e historial al abrir el tab de Ajuste Capital
+    if (typeof cargarDatosCapital === 'function') {
+      cargarDatosCapital();
+    }
+    if (typeof actualizarHistorialAjustes === 'function') {
+      actualizarHistorialAjustes();
+    }
   }
 }
 
@@ -144,7 +152,7 @@ function renderAnalisisGrafico() {
   }
 
   const datosPorMes = {};
-  let current = _tzStartOfDay(fechaInicio); current = inicioMes(0); // ya normalizado
+  let current = _tzStartOfDay(fechaInicio); // ya normalizado
   while (current <= hoy) {
     const key = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}`;
     datosPorMes[key] = { ingresos:0, gastos:0, extracciones:0 };

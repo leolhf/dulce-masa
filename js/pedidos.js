@@ -228,7 +228,10 @@ function registrarPedido(){
   if(!pedidos) pedidos=[];
   const total=pedidoActual.reduce((a,item)=>a+item.cantidad*item.precio,0);
   
-  pedidos.push({
+  // Guardar estado anterior para deshacer (pedido nuevo no tiene estado anterior)
+  const estadoAnterior = {};
+  
+  const pedido = {
     id:nextId.pedido++,
     fecha:today(),
     cliente,
@@ -239,7 +242,14 @@ function registrarPedido(){
     estado,
     items:[...pedidoActual],
     notas
-  });
+  };
+  
+  pedidos.push(pedido);
+  
+  // Guardar en historial para deshacer
+  if(typeof guardarAccionParaDeshacer === 'function'){
+    guardarAccionParaDeshacer('pedido', pedido, estadoAnterior);
+  }
   
   // Limpiar formulario
   $('pedido-cliente').value='';

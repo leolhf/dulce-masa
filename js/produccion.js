@@ -342,7 +342,14 @@ function registrarProd(){
       nuevaProduccion.variaciones = [...variacionesProduccion];
     }
     
+    // Estado anterior para deshacer
+    const _estadoAntesProduccion = {
+      ingredientesUsados: nuevaProduccion.ingredientesUsados ? JSON.parse(JSON.stringify(nuevaProduccion.ingredientesUsados)) : []
+    };
     producciones.push(nuevaProduccion);
+    if(typeof guardarAccionParaDeshacer === 'function'){
+      guardarAccionParaDeshacer('produccion', nuevaProduccion, _estadoAntesProduccion);
+    }
     
     // Recalcular stock desde cero para mantener consistencia con ventas y pedidos
     recalcStockProducto(rId);

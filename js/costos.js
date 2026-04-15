@@ -20,8 +20,9 @@ function calcCostoConFijos(r, tandas=1){
   const mesFin    = _tzDateStr(finMes(0));
   const uMes = producciones.filter(p=>p.fecha>=mesInicio&&p.fecha<=mesFin).reduce((a,p)=>{
     const rr=rec(p.recetaId); return a+(p.unidadesReales||(rr?rr.rinde*p.tandas:0));
-  },0) || 1;
-  const costoFijoPorUnidad = gfMensual / uMes;
+  },0);
+  const uMesTotal = uMes > 0 ? uMes : 1; // Evitar división por cero
+  const costoFijoPorUnidad = gfMensual / uMesTotal;
   const unidades = (r.rinde||1) * tandas;
   return costoIng + costoFijoPorUnidad * unidades;
 }
@@ -74,7 +75,7 @@ function showCostoDetalle(rId){
   const cU        = r.rinde>0 ? costoTotal/r.rinde : 0;
   const cUing     = r.rinde>0 ? costoIng/r.rinde : 0;
   const gfMensual = _gastoFijoMensual();
-  const costoFijoU= cU - cUing;
+  const costoFijoU= Math.max(0, cU - cUing);
   const pventa    = r.precioVenta||0;
   const margenReal= pventa>0 && cU>0 ? Math.round((pventa-cU)/pventa*100) : null;
   const gananciaU = pventa>0 ? pventa-cU : null;
@@ -133,7 +134,7 @@ function showCostoDetalle(rId){
 }
 
 function _htmlAnalisisPrecio(r, pventa, cU){
-  if(!pventa || pventa<=0 || !cU || cU<=0) return `<div style="font-size:.78rem;color:var(--text3)">Ingresá un precio para ver el análisis de margen.</div>`;
+  if(!pventa || pventa<=0 || cU<=0) return `<div style="font-size:.78rem;color:var(--text3)">Ingresá un precio válido para ver el análisis de margen.</div>`;
   const ganU    = pventa - cU;
   const margen  = Math.round(ganU/pventa*100);
   const color   = margen>=50?'ok':margen>=30?'warn':'danger';
@@ -148,7 +149,7 @@ function _htmlAnalisisPrecio(r, pventa, cU){
       <div style="color:var(--text3)">Ganancia/u</div>
     </div>
     <div style="text-align:center;padding:8px;background:var(--white);border-radius:var(--r);border:1px solid #E8CCAA">
-      <div style="font-weight:600;color:var(--caramel)">${fmt(ganU*r.rinde)}</div>
+      <div style="font-weight:600;color:var(--caramel)">${ganU !== null ? fmt(ganU*r.rinde) : '-'}</div>
       <div style="color:var(--text3)">Gan./tanda</div>
     </div>
   </div>`;

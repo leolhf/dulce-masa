@@ -329,7 +329,7 @@ class CapitalValidator {
   // Ejecutar validación automática
   static validarAutomaticamente() {
     // Obtener métricas actuales
-    const metricas = window._finMetricas ? window._finMetricas('mes_actual') : null;
+    const metricas = typeof _finMetricas === 'function' ? _finMetricas('mes_actual') : null;
     
     if (!metricas) {
       console.warn('No se pudieron obtener las métricas para validación');

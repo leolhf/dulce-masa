@@ -37,6 +37,7 @@ function renderInventario() {
   const q    = ($('inv-q').value || '').toLowerCase();
   const catF = $('inv-cat').value;
   const estF = $('inv-est').value;
+  const precioTipo = $('inv-precio-tipo')?.value; // Obtener tipo de precio seleccionado
 
   let lista = ingredientes.filter(i => {
     if (q    && !i.nombre.toLowerCase().includes(q)) return false;
@@ -71,6 +72,8 @@ function renderInventario() {
   tb.innerHTML = lista.map(i => {
     const sc = stockColor(i), sl = stockLabel(i);
     const pct = i.min > 0 ? Math.min(100, Math.round(i.stock / i.min * 100)) : 100;
+    // Obtener precio según el tipo seleccionado
+    const precioActual = obtenerPrecioSegunTipo(i.id);
     return `<tr>
       <td style="font-weight:500">${i.nombre}</td>
       <td style="font-size:.78rem;color:var(--text2)">${i.cat}</td>
@@ -81,7 +84,7 @@ function renderInventario() {
       <td>${fmtN(i.min, 3)} ${i.unidad}</td>
       <td>${i.unidad}</td>
       <td class="cell-editable" data-id="${i.id}" data-campo="precio" ondblclick="inlineEdit(+this.dataset.id,this.dataset.campo,this)" title="Doble clic para editar">
-        <span id="inv-precio-${i.id}">${fmt(i.precio)}</span>
+        <span id="inv-precio-${i.id}">${fmt(precioActual)}</span>
       </td>
       <td><span class="badge badge-${sc}">${sl}</span></td>
       <td class="td-actions">
@@ -91,6 +94,16 @@ function renderInventario() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── Obtener precio según tipo seleccionado ──
+function obtenerPrecioSegunTipo(ingId) {
+  if (typeof obtenerPrecioPromedioIngrediente === 'function') {
+    return obtenerPrecioPromedioIngrediente(ingId);
+  }
+  // Fallback a precio fijo si la función no está disponible
+  const ingrediente = ingredientes.find(i => i.id == ingId);
+  return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
 }
 
 // ── Edición inline de Stock y Precio ──
@@ -265,7 +278,12 @@ function guardarIng(){
     unidad:$('ing-unidad').value,
     precio:nuevoPrecio
   };
+  const _esNuevoIng = !editIngId;
+  const _valoresAntIng = editIngId ? {...ing(editIngId)} : null;
   if(editIngId){ingredientes=ingredientes.map(i=>i.id===editIngId?data:i);}else ingredientes.push(data);
+  if(typeof guardarAccionParaDeshacer === 'function'){
+    guardarAccionParaDeshacer('ingrediente', data, { esNuevo: _esNuevoIng, valoresAnteriores: _valoresAntIng });
+  }
   editIngId=null;closeModal('modal-ing');renderInventario();saveData();toast('Ingrediente guardado ✓');
 
   // Alerta si cambió el precio y hay recetas afectadas
