@@ -350,7 +350,7 @@ function confirmarAjuste(){
   toast(`"${i.nombre}": ${formatCantidad(prev, i.unidad)} → ${formatCantidad(i.stock, i.unidad)}`);
 }
 
-function verLotesIngrediente(ingId){
+function verLotesIngrediente(ingId, filtro = null){
   const ingrediente = ing(ingId);
   if(!ingrediente){ toast('Ingrediente no encontrado'); return; }
   if(typeof obtenerDetalleLotesIngrediente !== 'function'){
@@ -358,6 +358,17 @@ function verLotesIngrediente(ingId){
     return;
   }
   const lotes = obtenerDetalleLotesIngrediente(ingId) || [];
+  const filtroActual = filtro || document.getElementById('filtro-lotes-fifo')?.value || 'todos';
+  const lotesFiltrados = lotes.filter(l => {
+    if(filtroActual === 'activos') return l.estado === 'activo';
+    if(filtroActual === 'agotados') return l.estado === 'agotado';
+    if(filtroActual === 'enuso') return l.enUso;
+    if(filtroActual === 'revisar') return l.sospechoso;
+    return true;
+  });
+  const totalConsumido = lotes.reduce((sum,l) => sum + Number(l.cantidadConsumida || 0), 0);
+  const totalRestante = lotes.reduce((sum,l) => sum + Number(l.cantidadRestante || 0), 0);
+  const lotesSospechosos = lotes.filter(l => l.sospechoso).length;
   const prev = document.getElementById('modal-lotes-fifo');
   if(prev) prev.remove();
 
@@ -365,47 +376,173 @@ function verLotesIngrediente(ingId){
   overlay.className = 'modal-overlay open';
   overlay.id = 'modal-lotes-fifo';
   overlay.innerHTML = `
-    <div class="modal" style="max-width:760px">
+    <div class="modal" style="max-width:920px">
       <div class="modal-header">
         <span class="modal-title">Lotes FIFO — ${ingrediente.nombre}</span>
         <button class="modal-close" onclick="document.getElementById('modal-lotes-fifo').remove()">✕</button>
       </div>
       <div class="modal-body">
-        <div style="font-size:.78rem;color:var(--text3);margin-bottom:10px">
-          Stock actual: <strong>${formatCantidad(ingrediente.stock, ingrediente.unidad)}</strong>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div style="font-size:.78rem;color:var(--text3);background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:8px 11px">
+            Stock actual: <strong style="color:var(--text)">${formatCantidad(ingrediente.stock, ingrediente.unidad)}</strong>
+          </div>
+          <div style="font-size:.78rem;color:var(--text3);background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:8px 11px">
+            Consumido: <strong style="color:var(--text)">${fmtN(totalConsumido,3)} ${ingrediente.unidad}</strong>
+          </div>
+          <div style="font-size:.78rem;color:var(--text3);background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:8px 11px">
+            Restante en lotes: <strong style="color:var(--text)">${fmtN(totalRestante,3)} ${ingrediente.unidad}</strong>
+          </div>
+          <div style="font-size:.78rem;color:var(--text3);background:rgba(107,175,105,.1);border:1px solid rgba(107,175,105,.25);border-radius:var(--r);padding:8px 11px">
+            Lote en uso: <strong style="color:var(--ok)">marcado en verde</strong>. FIFO consume primero el lote disponible más antiguo.
+          </div>
+          ${lotesSospechosos ? `
+            <div style="font-size:.78rem;color:var(--warn);background:rgba(212,108,108,.08);border:1px solid rgba(212,108,108,.25);border-radius:var(--r);padding:8px 11px">
+              ${lotesSospechosos} lote${lotesSospechosos === 1 ? '' : 's'} para revisar
+            </div>
+          ` : ''}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <label style="font-size:.78rem;color:var(--text3)">Filtro</label>
+          <select id="filtro-lotes-fifo" onchange="verLotesIngrediente(${ingId}, this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem">
+            <option value="todos" ${filtroActual==='todos'?'selected':''}>Todos</option>
+            <option value="activos" ${filtroActual==='activos'?'selected':''}>Solo activos</option>
+            <option value="agotados" ${filtroActual==='agotados'?'selected':''}>Solo agotados</option>
+            <option value="enuso" ${filtroActual==='enuso'?'selected':''}>En uso</option>
+            <option value="revisar" ${filtroActual==='revisar'?'selected':''}>Para revisar</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="recalcularStockDesdeLotesModal(${ingId})">Recalcular stock desde lotes</button>
         </div>
         ${lotes.length === 0 ? `
           <p class="empty">Sin lotes registrados para este ingrediente.</p>
+        ` : lotesFiltrados.length === 0 ? `
+          <p class="empty">No hay lotes para el filtro seleccionado.</p>
         ` : `
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th>Uso</th>
                   <th>Fecha</th>
                   <th>Cantidad original</th>
+                  <th>Consumido</th>
                   <th>Cantidad restante</th>
                   <th>% restante</th>
                   <th>Costo/u</th>
+                  <th>Nota</th>
+                  <th>Último cambio</th>
                   <th>Estado</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
-                ${lotes.map(l => `
-                  <tr>
+                ${lotesFiltrados.map(l => {
+                  const estilosFila = [];
+                  if(l.enUso) estilosFila.push('background:rgba(107,175,105,.1)', 'outline:2px solid rgba(107,175,105,.28)');
+                  if(l.sospechoso && !l.enUso) estilosFila.push('background:rgba(212,108,108,.08)', 'outline:2px solid rgba(212,108,108,.24)');
+                  const ultimoCambio = Array.isArray(l.historialEdiciones) && l.historialEdiciones.length ? l.historialEdiciones[l.historialEdiciones.length - 1] : null;
+                  return `
+                  <tr id="lote-row-${l.id}" style="${estilosFila.join(';')}">
+                    <td>
+                      ${l.enUso ? '<span class="badge badge-ok" title="Este es el próximo lote que FIFO consume">En uso</span>' : l.estado === 'activo' ? '<span style="font-size:.72rem;color:var(--text3)">En espera</span>' : '<span style="font-size:.72rem;color:var(--text3)">—</span>'}
+                      ${l.sospechoso ? '<span class="badge badge-warn" title="Cantidad o costo fuera de lo habitual" style="margin-left:4px">Revisar</span>' : ''}
+                    </td>
                     <td>${l.fechaIngreso || '—'}</td>
-                    <td>${fmtN(l.cantidad,3)} ${ingrediente.unidad}</td>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                        <input id="lote-cantidad-${l.id}" type="number" min="0" step="0.001" value="${Number(l.cantidad || 0)}" style="width:105px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem">
+                        <span style="font-size:.75rem;color:var(--text3)">${ingrediente.unidad}</span>
+                        <button class="btn btn-secondary btn-sm" title="Divide la cantidad entre 1000 para corregir errores de decimal" onclick="corregirDecimalLote(${l.id})">÷1000</button>
+                      </div>
+                    </td>
+                    <td>${fmtN(l.cantidadConsumida,3)} ${ingrediente.unidad}</td>
                     <td style="font-weight:600">${fmtN(l.cantidadRestante,3)} ${ingrediente.unidad}</td>
                     <td>${l.porcentajeRestante}%</td>
-                    <td>${fmt(l.costoUnitario)}</td>
+                    <td>
+                      <input id="lote-costo-${l.id}" type="number" min="0" step="0.01" value="${Number(l.costoUnitario || 0)}" style="width:95px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem">
+                    </td>
+                    <td>
+                      <input id="lote-nota-${l.id}" type="text" value="${escapeHTML(l.nota || '')}" placeholder="Nota" style="width:140px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem">
+                    </td>
+                    <td style="font-size:.72rem;color:var(--text3);min-width:105px">
+                      ${ultimoCambio ? new Date(ultimoCambio.fecha).toLocaleString() : '—'}
+                    </td>
                     <td><span class="badge badge-${l.estado==='activo'?'ok':'warn'}">${l.estado}</span></td>
+                    <td>
+                      <button class="btn btn-primary btn-sm" onclick="guardarEdicionLoteFIFO(${l.id},${ingId})">Guardar</button>
+                    </td>
                   </tr>
-                `).join('')}
+                `}).join('')}
               </tbody>
             </table>
+          </div>
+          <div style="font-size:.75rem;color:var(--text3);margin-top:10px;line-height:1.45">
+            Si corriges una cantidad ya parcialmente consumida, se mantiene lo consumido y se recalcula la cantidad restante. El botón ÷1000 sirve para corregir errores típicos de decimal. Los cambios quedan registrados en el historial interno del lote.
           </div>
         `}
       </div>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+function corregirDecimalLote(loteId){
+  const input = document.getElementById(`lote-cantidad-${loteId}`);
+  if(!input) return;
+  const valor = parseFloat(input.value);
+  if(isNaN(valor)){ toast('Cantidad inválida'); return; }
+  input.value = +(valor / 1000).toFixed(6);
+}
+
+function recalcularStockDesdeLotesModal(ingId){
+  if(typeof sincronizarStockConLotes !== 'function'){ toast('Recalculo FIFO no disponible'); return; }
+  sincronizarStockConLotes();
+  renderInventario();
+  updateAlertBadge();
+  saveData();
+  verLotesIngrediente(ingId);
+  toast('Stock recalculado desde Lotes FIFO ✓');
+}
+
+function guardarEdicionLoteFIFO(loteId, ingId){
+  const lote = lotesIngredientes.find(l => l.id === loteId);
+  const ingrediente = ing(ingId);
+  if(!lote || !ingrediente){ toast('Lote no encontrado'); return; }
+  const cantidadInput = document.getElementById(`lote-cantidad-${loteId}`);
+  const costoInput = document.getElementById(`lote-costo-${loteId}`);
+  const notaInput = document.getElementById(`lote-nota-${loteId}`);
+  const nuevaCantidad = parseFloat(cantidadInput?.value);
+  const nuevoCosto = parseFloat(costoInput?.value);
+  const anteriorCantidad = lote.cantidad;
+  const anteriorCosto = lote.costoUnitario;
+  const stockAntes = ingrediente.stock;
+  const costoAntes = ingrediente.precio;
+  const consumido = Math.max(0, Number(lote.cantidad || 0) - Number(lote.cantidadRestante || 0));
+  const filtroActual = document.getElementById('filtro-lotes-fifo')?.value || 'todos';
+  const cambiosGrandes = (anteriorCantidad > 0 && Math.abs(nuevaCantidad - anteriorCantidad) / anteriorCantidad > .5) || (anteriorCosto > 0 && Math.abs(nuevoCosto - anteriorCosto) / anteriorCosto > .5);
+
+  if(nuevaCantidad < consumido){
+    if(!confirm(`Este lote ya consumió ${fmtN(consumido,3)} ${ingrediente.unidad}. Si guardas ${fmtN(nuevaCantidad,3)}, el restante quedará en 0. ¿Continuar?`)){
+      return;
+    }
+  }
+
+  if(cambiosGrandes){
+    if(!confirm('La cantidad o el costo cambia más del 50%. ¿Confirmas que quieres guardar esta corrección?')){
+      return;
+    }
+  }
+
+  try{
+    editarLoteFIFO(loteId, nuevaCantidad, nuevoCosto, notaInput ? notaInput.value : null);
+    renderInventario();
+    updateAlertBadge();
+    saveData();
+    const ingredienteActualizado = ing(ingId);
+    const stockDespues = ingredienteActualizado?.stock ?? stockAntes;
+    const costoDespues = ingredienteActualizado?.precio ?? costoAntes;
+    verLotesIngrediente(ingId, filtroActual);
+    toast(`Lote actualizado. Stock: ${fmtN(stockAntes,3)} → ${fmtN(stockDespues,3)} ${ingrediente.unidad} · Costo: ${fmt(costoAntes)} → ${fmt(costoDespues)}`);
+  }catch(e){
+    toast('No se pudo guardar el lote: ' + e.message);
+  }
 }
 

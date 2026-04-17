@@ -63,12 +63,42 @@ function renderVentasDia(){
   }
 }
 
+function stockFisicoProducto(recetaId){
+  const totalProducido = (producciones||[])
+    .filter(p => p.recetaId === recetaId)
+    .reduce((a, p) => {
+      const r = rec(p.recetaId);
+      return a + (p.unidadesReales || (r ? r.rinde * p.tandas : 0));
+    }, 0);
+  const totalVendido = (ventas||[])
+    .filter(v => v.recetaId === recetaId)
+    .reduce((a, v) => a + (v.unidades || 0), 0);
+  return Math.max(0, totalProducido - totalVendido);
+}
+
+function stockReservadoProducto(recetaId){
+  return (pedidos||[])
+    .filter(p => p.estado === 'listo' || p.estado === 'entregado_sin_cobrar')
+    .reduce((a, p) => a + (p.items||[])
+      .filter(it => it.recetaId === recetaId)
+      .reduce((b, it) => b + (it.cantidad || 0), 0), 0);
+}
+
+function etiquetaStockVenta(r){
+  const sp = stockProd(r.id);
+  const disponible = sp ? sp.stock : 0;
+  const reservado = stockReservadoProducto(r.id);
+  const fisico = stockFisicoProducto(r.id);
+  const extra = reservado > 0 ? ` (físico ${fisico}, reservado ${reservado})` : '';
+  return `${escapeHTML(r.nombre)} - Disponible: ${disponible} unidades${extra}`;
+}
+
 function renderVentas(){
   const opciones=recetas.map(r=>{
     const sp=stockProd(r.id);
     const stock=sp?sp.stock:0;
-    return [r.id, `${escapeHTML(r.nombre)} - Stock: ${stock} unidades`];
-  }).filter(([_,label])=>!label.includes('Stock: 0'));
+    return [r.id, etiquetaStockVenta(r), stock];
+  }).filter(([,,stock])=>stock>0).map(([id,label])=>[id,label]);
   fillSelect('venta-prod',opciones,'— Seleccionar —');
   // Solo resetear fecha si NO hay una edición en curso
   if(!$('venta-edit-id').value) $('venta-fecha').value=today();
@@ -79,8 +109,8 @@ function refreshVentaSelector(){
   const opciones=recetas.map(r=>{
     const sp=stockProd(r.id);
     const stock=sp?sp.stock:0;
-    return [r.id, `${escapeHTML(r.nombre)} - Stock: ${stock} unidades`];
-  }).filter(([_,label])=>!label.includes('Stock: 0'));
+    return [r.id, etiquetaStockVenta(r), stock];
+  }).filter(([,,stock])=>stock>0).map(([id,label])=>[id,label]);
   fillSelect('venta-prod',opciones,'— Seleccionar —');
 }
 function recalcStockProducto(recetaId){
@@ -153,7 +183,7 @@ function renderVentasTable(){
 }
 function editVenta(id){
   const v=ventas.find(x=>x.id==id);if(!v)return;
-  const opciones=recetas.map(r=>{const sp=stockProd(r.id);const stock=sp?sp.stock:0;return[r.id,`${r.nombre} - Stock: ${stock} unidades`];});
+  const opciones=recetas.map(r=>[r.id, etiquetaStockVenta(r)]);
   fillSelect('venta-prod',opciones,'— Seleccionar —');
   $('venta-edit-id').value=id;
   $('venta-prod').value=v.recetaId;
@@ -199,11 +229,11 @@ function registrarVenta(){
       // Receta cambió: restaurar stock original y descontar del nuevo
       if(spOriginal) spOriginal.stock=Math.max(0,spOriginal.stock+original.unidades);
       const stockDisp=sp?sp.stock:0;
-      if(unidades>stockDisp){toast(`Stock insuficiente para la nueva receta. Solo hay ${stockDisp} unidades disponibles`);return;}
+      if(unidades>stockDisp){const reservado=stockReservadoProducto(recetaId);toast(`Stock insuficiente para la nueva receta. Disponible: ${stockDisp}${reservado>0?' · Reservado: '+reservado:''}`);return;}
       if(sp) sp.stock=Math.max(0,sp.stock-unidades);
     } else {
       diffUnidades=unidades-original.unidades;
-      if(diffUnidades>0){const stockDisp=sp?sp.stock:0;if(diffUnidades>stockDisp){toast(`Stock insuficiente. Solo hay ${stockDisp} unidades disponibles`);return;}}
+      if(diffUnidades>0){const stockDisp=sp?sp.stock:0;if(diffUnidades>stockDisp){const reservado=stockReservadoProducto(recetaId);toast(`Stock insuficiente. Disponible: ${stockDisp}${reservado>0?' · Reservado: '+reservado:''}`);return;}}
       if(sp)sp.stock=Math.max(0,sp.stock-diffUnidades);
     }
     Object.assign(original,{fecha,recetaId,unidades,precio,propina,canal,nota});
@@ -217,7 +247,7 @@ function registrarVenta(){
   }else{
     const sp=stockProd(recetaId);
     const stockDisponible=sp?sp.stock:0;
-    if(unidades>stockDisponible){toast(`Stock insuficiente. Solo hay ${stockDisponible} unidades disponibles`);return;}
+    if(unidades>stockDisponible){const reservado=stockReservadoProducto(recetaId);toast(`Stock insuficiente. Disponible: ${stockDisponible}${reservado>0?' · Reservado: '+reservado:''}`);return;}
     
     // Guardar estado anterior para deshacer
     const estadoAnterior = {

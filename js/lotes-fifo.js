@@ -263,16 +263,82 @@ function inicializarLotesDesdeStock() {
   sincronizarStockConLotes();
 }
 
+function esLoteSospechosoFIFO(lote, ingrediente) {
+  const cantidad = Number(lote.cantidad || 0);
+  const costo = Number(lote.costoUnitario || 0);
+  const unidad = String(ingrediente?.unidad || '').toLowerCase();
+  const costoActual = Number(ingrediente?.precio || 0);
+
+  if (['kg', 'l', 'lt', 'litro', 'litros'].includes(unidad) && cantidad > 100) return true;
+  if (['g', 'gr', 'gramo', 'gramos', 'ml'].includes(unidad) && cantidad > 100000) return true;
+  if (costoActual > 0 && costo > costoActual * 5) return true;
+  return false;
+}
+
 // Función para obtener detalle de lotes de un ingrediente
 function obtenerDetalleLotesIngrediente(ingredienteId) {
+  const loteEnUso = obtenerLotesDisponibles(ingredienteId)[0];
+  const ingrediente = typeof ing === 'function' ? ing(ingredienteId) : null;
   return lotesIngredientes
     .filter(lote => lote.ingredienteId === ingredienteId)
     .sort((a, b) => new Date(b.fechaIngreso) - new Date(a.fechaIngreso))
     .map(lote => ({
       ...lote,
+      cantidadConsumida: +Math.max(0, Number(lote.cantidad || 0) - Number(lote.cantidadRestante || 0)).toFixed(4),
       porcentajeRestante: lote.cantidad > 0 ? (lote.cantidadRestante / lote.cantidad * 100).toFixed(1) : 0,
-      estado: lote.cantidadRestante > 0 ? 'activo' : 'agotado'
+      estado: lote.cantidadRestante > 0 ? 'activo' : 'agotado',
+      enUso: !!loteEnUso && lote.id === loteEnUso.id,
+      sospechoso: esLoteSospechosoFIFO(lote, ingrediente)
     }));
+}
+
+function editarLoteFIFO(loteId, nuevaCantidad, nuevoCostoUnitario, nuevaNota = null) {
+  const lote = lotesIngredientes.find(l => l.id === loteId);
+  if (!lote) throw new Error('Lote no encontrado');
+
+  const cantidad = Number(nuevaCantidad);
+  const costoUnitario = Number(nuevoCostoUnitario);
+  if (isNaN(cantidad) || cantidad < 0) throw new Error('Cantidad inválida');
+  if (isNaN(costoUnitario) || costoUnitario < 0) throw new Error('Precio inválido');
+
+  const anterior = {
+    cantidad: Number(lote.cantidad || 0),
+    costoUnitario: Number(lote.costoUnitario || 0),
+    cantidadRestante: Number(lote.cantidadRestante || 0),
+    nota: lote.nota || ''
+  };
+  const consumido = Math.max(0, anterior.cantidad - anterior.cantidadRestante);
+  lote.cantidad = +cantidad.toFixed(4);
+  lote.costoUnitario = +costoUnitario.toFixed(4);
+  lote.cantidadRestante = Math.max(0, +(lote.cantidad - consumido).toFixed(4));
+  if (nuevaNota !== null) lote.nota = String(nuevaNota || '').trim();
+
+  const cambioNota = nuevaNota !== null && anterior.nota !== lote.nota;
+  if (anterior.cantidad !== lote.cantidad || anterior.costoUnitario !== lote.costoUnitario || anterior.cantidadRestante !== lote.cantidadRestante || cambioNota) {
+    if (!Array.isArray(lote.historialEdiciones)) lote.historialEdiciones = [];
+    lote.historialEdiciones.push({
+      fecha: new Date().toISOString(),
+      tipo: 'edicion_manual',
+      antes: anterior,
+      despues: {
+        cantidad: lote.cantidad,
+        costoUnitario: lote.costoUnitario,
+        cantidadRestante: lote.cantidadRestante,
+        nota: lote.nota || ''
+      }
+    });
+  }
+
+  if (lote.compraId != null && Array.isArray(historialCompras)) {
+    const compra = historialCompras.find(c => c.id == lote.compraId);
+    if (compra) {
+      compra.qty = lote.cantidad;
+      compra.precio = lote.costoUnitario;
+    }
+  }
+
+  sincronizarStockConLotes();
+  return lote;
 }
 
 // Estima costo FIFO sin mutar stock/lotes
