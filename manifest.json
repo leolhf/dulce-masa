@@ -2,8 +2,8 @@
   "name": "Dulce & Masa - Gestión de Repostería",
   "short_name": "Dulce & Masa",
   "description": "Sistema completo de gestión para reposterías y negocios de pastelería",
-  "start_url": "/dulce-masa/",
-  "scope": "/dulce-masa/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#4A3218",
   "theme_color": "#4A3218",
@@ -25,21 +25,21 @@
       "name": "Nueva Venta",
       "short_name": "Venta",
       "description": "Registrar una venta rápida",
-      "url": "/dulce-masa/?action=venta",
+      "url": "./?action=venta",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Inventario",
       "short_name": "Stock",
       "description": "Ver y gestionar inventario",
-      "url": "/dulce-masa/?action=inventario",
+      "url": "./?action=inventario",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Compras",
       "short_name": "Compras",
       "description": "Registrar compras de insumos",
-      "url": "/dulce-masa/?action=compras",
+      "url": "./?action=compras",
       "icons": [{ "src": "icon-96.png", "sizes": "96x96" }]
     }
   ],

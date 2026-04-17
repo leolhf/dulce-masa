@@ -278,7 +278,30 @@ function calcularDesdeCantidad(){
 
 function guardarCompra(){
   const ingId = parseInt($('compra-ing').value);
-  const provId = parseInt($('compra-prov').value) || null;
+  let provId = parseInt($('compra-prov').value) || null;
+  const provNombreInput = $('compra-prov-input').value.trim();
+  const provValor = $('compra-prov').value;
+  if (!provId && provNombreInput) {
+    const proveedorExistente = proveedores.find(p =>
+      p.nombre.trim().toLowerCase() === provNombreInput.toLowerCase()
+    );
+    if (proveedorExistente) {
+      provId = proveedorExistente.id;
+    } else {
+      const nuevoProveedor = {
+        id: nextId.prov++,
+        nombre: provNombreInput,
+        contacto: '',
+        tel: '',
+        email: '',
+        productos: '',
+        dir: '',
+        notas: ''
+      };
+      proveedores.push(nuevoProveedor);
+      provId = nuevoProveedor.id;
+    }
+  }
   const fecha = $('compra-fecha').value;
   const qty = parseFloat($('compra-qty').value);
   const precio = parseFloat($('compra-precio').value);
@@ -297,7 +320,7 @@ function guardarCompra(){
   if (!ingrediente) { toast('Ingrediente no encontrado'); return; }
   
   const compraData = {
-    id: editId ? parseInt(editId) : nextId.historial++,
+    id: editId ? parseInt(editId) : nextId.comp++,
     ingId,
     ingNombre: ingrediente.nombre,
     ingUnidad: ingrediente.unidad,
@@ -308,14 +331,26 @@ function guardarCompra(){
     precio,
     total,
     notas,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    loteId: null
   };
   
   if (editId) {
     // Editar compra existente
     const index = historialCompras.findIndex(c => c.id === parseInt(editId));
     if (index !== -1) {
+      const compraAnterior = historialCompras[index];
+      const loteAnterior = compraAnterior.loteId ? lotesIngredientes.find(l => l.id === compraAnterior.loteId) : null;
+      if (loteAnterior && loteAnterior.cantidadRestante < loteAnterior.cantidad) {
+        toast('No se puede editar: esta compra ya fue consumida en producción FIFO');
+        return;
+      }
+      if (compraAnterior.loteId) eliminarLotePorId(compraAnterior.loteId);
       historialCompras[index] = compraData;
+      const lote = crearLote(ingId, qty, precio, fecha, provId, null, notas || '');
+      compraData.loteId = lote.id;
+      sincronizarStockConLotes();
+      
       toast('Compra actualizada correctamente');
     }
   } else {
@@ -328,6 +363,10 @@ function guardarCompra(){
     // Nueva compra
     historialCompras.push(compraData);
     
+    const lote = crearLote(ingId, qty, precio, fecha, provId, null, notas || '');
+    compraData.loteId = lote.id;
+    sincronizarStockConLotes();
+    
     // Guardar en historial para deshacer
     if(typeof guardarAccionParaDeshacer === 'function'){
       guardarAccionParaDeshacer('compra', compraData, estadoAnterior);
@@ -336,16 +375,12 @@ function guardarCompra(){
     toast('Compra registrada correctamente');
   }
   
-  // Actualizar stock del ingrediente
-  const ingActual = ingredientes.find(i => i.id === ingId);
-  if (ingActual) {
-    ingActual.stock = (ingActual.stock || 0) + qty;
-  }
-  
   // Cerrar modal y actualizar vistas
   closeModal('modal-compra');
   renderHistorial();
   renderFinanzas();
+  renderProveedores();
+  refreshProvSelects();
   saveData();
   
   // Limpiar formulario
@@ -361,11 +396,12 @@ function delCompra(id){
     return;
   }
   
-  // Restar del stock del ingrediente
-  const ingrediente = ingredientes.find(i => i.id === compra.ingId);
-  if (ingrediente) {
-    ingrediente.stock = Math.max(0, (ingrediente.stock || 0) - compra.qty);
+  const loteAsociado = compra.loteId ? lotesIngredientes.find(l => l.id === compra.loteId) : null;
+  if (loteAsociado && loteAsociado.cantidadRestante < loteAsociado.cantidad) {
+    toast('No se puede eliminar: la compra ya fue consumida en producción FIFO');
+    return;
   }
+  if (compra.loteId) eliminarLotePorId(compra.loteId);
   
   // Eliminar la compra
   historialCompras = historialCompras.filter(c => c.id !== id);

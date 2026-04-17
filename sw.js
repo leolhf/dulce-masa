@@ -7,8 +7,10 @@ const DYNAMIC_CACHE = 'dulce-masa-dynamic-v15';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './movil.html',
   './styles.css',
   './manifest.json',
+  './movil-manifest.json',
   // CSS modular
   './css/base.css',
   './css/nav.css',
@@ -123,6 +125,10 @@ self.addEventListener('fetch', event => {
         // Offline: buscar en cache
         return caches.match(request).then(cached => {
           if (cached) return cached;
+          // Fallback específico para vista móvil
+          if (request.url.includes('movil.html')) {
+            return caches.match('./movil.html');
+          }
           // Fallback para páginas HTML
           if (request.headers.get('accept')?.includes('text/html')) {
             return caches.match('./index.html');

@@ -74,12 +74,16 @@ function _cargarDatosJSON(text){
   if(data.stockProductos) stockProductos=data.stockProductos;
   if(data.proveedores) proveedores=data.proveedores;
   if(data.historialCompras) historialCompras=data.historialCompras;
+  if(data.lotesIngredientes) lotesIngredientes=data.lotesIngredientes;
   if(data.nextId) nextId=data.nextId;
   if(data.catRecetas && Array.isArray(data.catRecetas) && data.catRecetas.length>0) catRecetas=data.catRecetas;
   if(data.gastosFijos && Array.isArray(data.gastosFijos)) gastosFijos=data.gastosFijos;
   if(data.extracciones && Array.isArray(data.extracciones)) extracciones=data.extracciones;
   if(data.prestamos && Array.isArray(data.prestamos)) prestamos=data.prestamos;
   if(data.metas && Array.isArray(data.metas)) metas=data.metas;
+  if (data.capital_ajustes && Array.isArray(data.capital_ajustes)) {
+    CapitalAdjustment.ajustes = data.capital_ajustes;
+  }
 
   // Sanear nextId — mismo fix que data-init.js
   if(!nextId) nextId={};
@@ -87,6 +91,7 @@ function _cargarDatosJSON(text){
   nextId.venta=nextId.venta||1; nextId.comp=nextId.comp||nextId.compra||1;
   nextId.prov=nextId.prov||1; nextId.pedido=nextId.pedido||1;
   nextId.ext=nextId.ext||1; nextId.prestamo=nextId.prestamo||1;
+  nextId.lote=nextId.lote||1;
 
   // Sanear ids inválidos en historialCompras
   let _maxC=0;
@@ -96,6 +101,52 @@ function _cargarDatosJSON(text){
 
   saveData();
   initApp();
+}
+
+// Wrapper específico para exportar compras desde el botón de Compras
+function exportarComprasCSV(){
+  const anterior = curSection;
+  curSection = 'historial';
+  exportCSV();
+  curSection = anterior;
+}
+
+function exportarResumenFinancieroMensualCSV(){
+  if (typeof _finSerieMensual !== 'function') {
+    toast('No se pudo generar el resumen financiero');
+    return;
+  }
+  const serie = _finSerieMensual(12);
+  if (!serie || serie.length === 0) {
+    toast('Sin datos para exportar');
+    return;
+  }
+  const rows = [[
+    'Mes',
+    'Ingresos',
+    'Costos ingredientes',
+    'Gastos fijos',
+    'Prestamos entrantes',
+    'Extracciones',
+    'Flujo neto'
+  ]];
+  serie.forEach(m => {
+    rows.push([
+      m.label,
+      m.ingresos.toFixed(2),
+      m.costosIngredientes.toFixed(2),
+      m.gastosFijos.toFixed(2),
+      m.prestamosEntrantes.toFixed(2),
+      m.extracciones.toFixed(2),
+      m.flujoNeto.toFixed(2)
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = 'resumen-financiero-mensual.csv';
+  a.click();
+  toast('Resumen financiero mensual exportado ✓');
 }
 
 // initializeData() definida en data-init.js

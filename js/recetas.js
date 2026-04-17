@@ -13,7 +13,7 @@ function renderRecetas(){
     if(dispF==='ok'&&!canProduce(r))return false;
     if(dispF==='nok'&&canProduce(r))return false;
     return true;
-  });
+  }).sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const tb=$('tbl-rec').querySelector('tbody');
   if(lista.length===0){tb.innerHTML='<tr><td colspan="8" class="empty">Sin resultados</td></tr>';return;}
   tb.innerHTML=lista.map(r=>{
@@ -212,7 +212,7 @@ function verReceta(id){
     </div>
     ${r.desc?`<p style="font-size:.84rem;color:var(--text2);padding:10px 14px;background:var(--cream);border-radius:var(--r);margin-bottom:14px">${r.desc}</p>`:''}
     <div style="font-size:.77rem;font-weight:500;color:var(--text2);margin-bottom:8px">Ingredientes por tanda</div>
-    ${r.ings.map(ri=>{const i=ing(ri.ingId);if(!i)return'';const ok=i.stock>=ri.qty;
+    ${r.ings.sort((a,b)=>{const iA=ing(a.ingId);const iB=ing(b.ingId);return iA?.nombre?.localeCompare(iB?.nombre)||0;}).map(ri=>{const i=ing(ri.ingId);if(!i)return'';const ok=i.stock>=ri.qty;
     return`<div class="prod-check ${ok?'ok':'nok'}" style="margin-bottom:5px"><span class="pc-label">${i.nombre}</span><span class="pc-status">${fmtN(ri.qty,3)} ${i.unidad} · hay ${formatCantidad(i.stock, i.unidad)}</span></div>`;}).join('')}
     <div class="price-box" style="margin-top:14px">
       <div class="price-box-title">Costos y precios sugeridos</div>

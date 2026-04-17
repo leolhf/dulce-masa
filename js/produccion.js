@@ -135,6 +135,9 @@ function renderProdTable(){
     } else {
       costoCalculo = calcCosto(r, p.tandas);
     }
+    if(typeof p.costoReal === 'number' && p.costoReal > 0){
+      costoCalculo = p.costoReal;
+    }
     
     const planificado=r?r.rinde*p.tandas:0;
     const real=p.unidadesReales||planificado;
@@ -239,7 +242,13 @@ function calcProd(){
     </div>`;
   }
 
-  el.innerHTML=`<div style="font-size:.78rem;font-weight:500;color:var(--text2);margin-bottom:7px">Planificado: ${planificado} unidades${reales>0?` · Real: ${reales} unidades`:''} · Costo: ${fmt(calcCosto(recetaCalculo,tandas))}</div>${rows}
+  let costoPreview = calcCosto(recetaCalculo,tandas);
+  try{
+    if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
+      costoPreview = estimarCostoFIFO(recetaCalculo, tandas).costoTotal;
+    }
+  }catch(e){}
+  el.innerHTML=`<div style="font-size:.78rem;font-weight:500;color:var(--text2);margin-bottom:7px">Planificado: ${planificado} unidades${reales>0?` · Real: ${reales} unidades`:''} · Costo: ${fmt(costoPreview)}</div>${rows}
     <div style="margin-top:8px;font-size:.82rem;font-weight:500;color:var(--${canP?'ok':'danger'})">${canP?'✓ Stock suficiente':'✗ Falta stock'}</div>${mermaInfo}${vinculacionHTML}`;
   
   // Actualizar vista de variaciones
@@ -268,9 +277,11 @@ function registrarProd(){
     // Solo procesar si realmente hay cambios
     if(p.tandas!==tandas || p.unidadesReales!==reales || p.recetaId!==rId || p.fecha!==($('prod-fecha').value||today()) || p.nota!==($('prod-nota').value.trim())){
       
-      // Devolver ingredientes de la producción original al stock
+      // Devolver ingredientes de la producción original al stock/lotes
       const rOriginal=rec(p.recetaId);
-      if(rOriginal){
+      if(p.consumoLotes && p.consumoLotes.length > 0){
+        devolverConsumoLotes(p.consumoLotes);
+      } else if(rOriginal){
         rOriginal.ings.forEach(ri=>{
           const i=ing(ri.ingId);
           if(i)i.stock=+(i.stock + ri.qty*p.tandas).toFixed(4);
@@ -280,7 +291,11 @@ function registrarProd(){
       // Verificar stock para la nueva configuración
       if(!canProduce(recetaCalculo,tandas)){
         // Revertir devolución de ingredientes si no hay stock suficiente
-        if(rOriginal){
+        if(p.consumoLotes && p.consumoLotes.length > 0){
+          try{
+            consumirDesdeDetalleLotes(p.consumoLotes);
+          }catch(e){}
+        } else if(rOriginal){
           rOriginal.ings.forEach(ri=>{
             const i=ing(ri.ingId);
             if(i)i.stock=Math.max(0,+(i.stock - ri.qty*p.tandas).toFixed(4));
@@ -301,8 +316,27 @@ function registrarProd(){
         p.variaciones = [...variacionesProduccion];
       }
       
-      // Descontar ingredientes nuevos (usando receta variada)
-      recetaCalculo.ings.forEach(ri=>{const i=ing(ri.ingId);if(i)i.stock=Math.max(0,+(i.stock-ri.qty*tandas).toFixed(4));});
+      // Descontar ingredientes nuevos (usando FIFO si está activo)
+      let consumoNuevo = null;
+      if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
+        try{
+          consumoNuevo = consumirIngredientesFIFO(recetaCalculo, tandas);
+          p.costoReal = +consumoNuevo.costoTotal.toFixed(2);
+          p.consumoLotes = consumoNuevo.detalleConsumo;
+        }catch(e){
+          // restaurar consumo original si el nuevo consumo FIFO falla
+          if(p.consumoLotes && p.consumoLotes.length > 0){
+            try{ consumirDesdeDetalleLotes(p.consumoLotes); }catch(err){}
+          }
+          toast(e.message || 'Stock insuficiente para FIFO');
+          return;
+        }
+      }else{
+        recetaCalculo.ings.forEach(ri=>{const i=ing(ri.ingId);if(i)i.stock=Math.max(0,+(i.stock-ri.qty*tandas).toFixed(4));});
+        // fuera de FIFO, evitar costo real congelado
+        delete p.costoReal;
+        delete p.consumoLotes;
+      }
       
       // Recalcular stock de productos terminados desde cero (evita desfases por ventas)
       recalcStockProducto(rId);
@@ -326,7 +360,17 @@ function registrarProd(){
   }else{
     // NUEVA producción
     if(!canProduce(recetaCalculo,tandas)){toast('Stock insuficiente');return;}
-    recetaCalculo.ings.forEach(ri=>{const i=ing(ri.ingId);if(i)i.stock=Math.max(0,+(i.stock-ri.qty*tandas).toFixed(4));});
+    let consumoFIFO = null;
+    if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
+      try{
+        consumoFIFO = consumirIngredientesFIFO(recetaCalculo, tandas);
+      }catch(e){
+        toast(e.message || 'Stock insuficiente');
+        return;
+      }
+    } else {
+      recetaCalculo.ings.forEach(ri=>{const i=ing(ri.ingId);if(i)i.stock=Math.max(0,+(i.stock-ri.qty*tandas).toFixed(4));});
+    }
     
     // Guardar producción con variaciones si existen
     const nuevaProduccion = {
@@ -337,6 +381,10 @@ function registrarProd(){
       unidadesReales:unidadesProducidas,
       nota:$('prod-nota').value.trim()
     };
+    if(consumoFIFO){
+      nuevaProduccion.costoReal = +consumoFIFO.costoTotal.toFixed(2);
+      nuevaProduccion.consumoLotes = consumoFIFO.detalleConsumo;
+    }
     
     if(variacionesProduccion.length > 0){
       nuevaProduccion.variaciones = [...variacionesProduccion];
@@ -364,7 +412,7 @@ function registrarProd(){
   variacionesProduccion = [];
   actualizarVistaVariaciones();
   
-  calcProd();renderProdTable();refreshAllStockViews();
+  calcProd();renderProdTable();refreshAllStockViews();saveData();
 }
 function cancelarEdicionProd(){
   editandoProdId=null;
@@ -394,8 +442,12 @@ function delProd(id){
 
   const _ejecutarElim = () => {
     const recetaId=p.recetaId;
-    // Devolver ingredientes al stock
-    r.ings.forEach(ri=>{ const i=ing(ri.ingId); if(i)i.stock=+(i.stock+ri.qty*p.tandas).toFixed(4); });
+    // Devolver ingredientes al stock/lotes
+    if(p.consumoLotes && p.consumoLotes.length > 0){
+      devolverConsumoLotes(p.consumoLotes);
+    }else{
+      r.ings.forEach(ri=>{ const i=ing(ri.ingId); if(i)i.stock=+(i.stock+ri.qty*p.tandas).toFixed(4); });
+    }
     producciones=producciones.filter(x=>x.id!==id);
     // Recalcular stock del producto terminado desde cero
     recalcStockProducto(recetaId);

@@ -16,9 +16,9 @@ function filtrarIngredientesCompra() {
 
   if (existentes.length > 0) {
     sugerencias.innerHTML = existentes.map(i => `
-      <div onclick="seleccionarIngredienteCompra(${i.id}, '${i.nombre.replace(/'/g, "\\'")}', '${i.unidad}')">
-        <strong>${i.nombre}</strong>
-        <span style="font-size:.74rem;color:var(--text3);margin-left:8px">${formatCantidad(i.stock, i.unidad)} · ${i.unidad}</span>
+      <div onclick="seleccionarIngredienteCompra(${i.id}, '${escapeHTML(i.nombre).replace(/'/g, "\\'")}', '${escapeHTML(i.unidad)}')">
+        <strong>${escapeHTML(i.nombre)}</strong>
+        <span style="font-size:.74rem;color:var(--text3);margin-left:8px">${formatCantidad(i.stock, i.unidad)} · ${escapeHTML(i.unidad)}</span>
       </div>
     `).join('');
 
@@ -26,13 +26,13 @@ function filtrarIngredientesCompra() {
     if (!coincidenciaExacta) {
       sugerencias.innerHTML += `
         <div class="nuevo" onclick="mostrarCamposIngredienteNuevo()">
-          <strong>➕ Agregar "${input}" como ingrediente nuevo</strong>
+          <strong>➕ Agregar "${escapeHTML(input)}" como ingrediente nuevo</strong>
         </div>`;
     }
   } else {
     sugerencias.innerHTML = `
       <div class="nuevo" onclick="mostrarCamposIngredienteNuevo()">
-        <strong>➕ Agregar "${input}" como ingrediente nuevo</strong>
+        <strong>➕ Agregar "${escapeHTML(input)}" como ingrediente nuevo</strong>
       </div>`;
   }
   sugerencias.style.display = 'block';
@@ -60,12 +60,12 @@ function mostrarCamposIngredienteNuevo() {
   $('nuevo-ing-unidad').selectedIndex = 0;
 }
 
-function mostrarSugerenciasIngredientes() {
+function mostrarSugerenciasIngredientesCompra() {
   const inputElement = $('compra-ing-input');
   if (inputElement && inputElement.value.length >= 2) filtrarIngredientesCompra();
 }
 
-function ocultarSugerenciasIngredientes() {
+function ocultarSugerenciasIngredientesCompra() {
   setTimeout(() => {
     const el = $('sugerencias-compra-ing');
     if (el) el.style.display = 'none';
@@ -74,7 +74,17 @@ function ocultarSugerenciasIngredientes() {
 
 // ── Proveedores ──
 function filtrarProveedoresCompra() {
-  const input      = $('compra-prov-input').value.toLowerCase();
+  const textoProveedor = $('compra-prov-input').value.trim();
+  if (
+    proveedorSeleccionado &&
+    proveedorSeleccionado.nombre &&
+    proveedorSeleccionado.nombre.toLowerCase() !== textoProveedor.toLowerCase()
+  ) {
+    $('compra-prov').value = '';
+    proveedorSeleccionado = null;
+  }
+  
+  const input      = textoProveedor.toLowerCase();
   const sugerencias = $('sugerencias-compra-prov');
   if (input.length < 2) { sugerencias.style.display = 'none'; return; }
 
@@ -84,8 +94,8 @@ function filtrarProveedoresCompra() {
 
   if (existentes.length > 0) {
     sugerencias.innerHTML = existentes.map(p => `
-      <div onclick="seleccionarProveedorCompra(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')">
-        <strong>${p.nombre}</strong>
+      <div onclick="seleccionarProveedorCompra(${p.id}, '${escapeHTML(p.nombre).replace(/'/g, "\\'")}')">
+        <strong>${escapeHTML(p.nombre)}</strong>
       </div>
     `).join('');
 
@@ -93,13 +103,13 @@ function filtrarProveedoresCompra() {
     if (!coincidenciaExacta) {
       sugerencias.innerHTML += `
         <div class="nuevo" onclick="mostrarCamposProveedorNuevo()">
-          <strong>➕ Agregar "${input}" como proveedor nuevo</strong>
+          <strong>➕ Agregar "${escapeHTML(input)}" como proveedor nuevo</strong>
         </div>`;
     }
   } else {
     sugerencias.innerHTML = `
       <div class="nuevo" onclick="mostrarCamposProveedorNuevo()">
-        <strong>➕ Agregar "${input}" como proveedor nuevo</strong>
+        <strong>➕ Agregar "${escapeHTML(input)}" como proveedor nuevo</strong>
       </div>`;
   }
   sugerencias.style.display = 'block';

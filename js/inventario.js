@@ -88,6 +88,7 @@ function renderInventario() {
       </td>
       <td><span class="badge badge-${sc}">${sl}</span></td>
       <td class="td-actions">
+        <button class="btn btn-secondary btn-sm btn-icon" data-id="${i.id}" onclick="verLotesIngrediente(+this.dataset.id)" title="Ver lotes FIFO">📦</button>
         <button class="btn btn-ok btn-sm btn-icon" data-id="${i.id}" onclick="abrirAjuste(+this.dataset.id)" title="Ajustar stock">±</button>
         <button class="btn btn-secondary btn-sm btn-icon" data-id="${i.id}" onclick="editIng(+this.dataset.id)" title="Editar">✎</button>
         <button class="btn btn-danger btn-sm btn-icon" data-id="${i.id}" onclick="delIng(+this.dataset.id)" title="Eliminar">✕</button>
@@ -143,7 +144,11 @@ function inlineEdit(ingId, campo, td) {
     }
     const anterior = campo === 'stock' ? i.stock : i.precio;
     if (campo === 'stock') {
-      i.stock = +nuevo.toFixed(4);
+      if(typeof ajustarStockManualEnLotes === 'function' && Array.isArray(lotesIngredientes)){
+        ajustarStockManualEnLotes(i.id, nuevo, i.precio, 'Ajuste manual (edición inline)');
+      } else {
+        i.stock = +nuevo.toFixed(4);
+      }
     } else {
       i.precio = +nuevo.toFixed(2);
     }
@@ -261,9 +266,11 @@ function guardarIng(){
 
   // Detectar cambio de precio antes de guardar
   let precioAnterior = null;
+  let stockAnterior = null;
   if(editIngId){
     const ingExistente = ing(editIngId);
     if(ingExistente) precioAnterior = ingExistente.precio;
+    if(ingExistente) stockAnterior = ingExistente.stock;
   }
 
   // Preservar campos extra del ingrediente original (ej: provId) que el modal no edita
@@ -281,6 +288,10 @@ function guardarIng(){
   const _esNuevoIng = !editIngId;
   const _valoresAntIng = editIngId ? {...ing(editIngId)} : null;
   if(editIngId){ingredientes=ingredientes.map(i=>i.id===editIngId?data:i);}else ingredientes.push(data);
+  const cambioStock = stockAnterior === null || Math.abs((stockAnterior || 0) - (data.stock || 0)) > 0.0001;
+  if(cambioStock && typeof ajustarStockManualEnLotes === 'function' && Array.isArray(lotesIngredientes)){
+    ajustarStockManualEnLotes(data.id, data.stock, data.precio, editIngId ? 'Ajuste manual (editar ingrediente)' : 'Stock inicial ingrediente');
+  }
   if(typeof guardarAccionParaDeshacer === 'function'){
     guardarAccionParaDeshacer('ingrediente', data, { esNuevo: _esNuevoIng, valoresAnteriores: _valoresAntIng });
   }
@@ -298,6 +309,9 @@ function delIng(id){
     : '';
   confirmar({ titulo:'Eliminar ingrediente', mensaje:msg, labelOk:'Eliminar', tipo:'danger',
     onOk:()=>{
+      if(Array.isArray(lotesIngredientes)){
+        lotesIngredientes = lotesIngredientes.filter(l => l.ingredienteId !== id);
+      }
       ingredientes=ingredientes.filter(i=>i.id!==id);
       recetas=recetas.map(r=>({...r,ings:r.ings.filter(ri=>ri.ingId!=id)}));
       renderInventario();renderRecetas();saveData();toast('Ingrediente eliminado ✓');
@@ -323,10 +337,75 @@ function confirmarAjuste(){
   const qty=parseFloat($('ajuste-qty').value);
   if(isNaN(qty)||qty<0){toast('Cantidad inválida');return;}
   const prev=i.stock;
-  if(ajusteTab==='sumar')i.stock=+(i.stock+qty).toFixed(4);
-  else if(ajusteTab==='restar')i.stock=Math.max(0,+(i.stock-qty).toFixed(4));
-  else i.stock=+qty.toFixed(4);
+  let nuevoStock = prev;
+  if(ajusteTab==='sumar')nuevoStock=+(i.stock+qty).toFixed(4);
+  else if(ajusteTab==='restar')nuevoStock=Math.max(0,+(i.stock-qty).toFixed(4));
+  else nuevoStock=+qty.toFixed(4);
+  if(typeof ajustarStockManualEnLotes === 'function' && Array.isArray(lotesIngredientes)){
+    ajustarStockManualEnLotes(i.id, nuevoStock, i.precio, 'Ajuste manual (modal de ajuste)');
+  } else {
+    i.stock = nuevoStock;
+  }
   closeModal('modal-ajuste');renderInventario();saveData();
   toast(`"${i.nombre}": ${formatCantidad(prev, i.unidad)} → ${formatCantidad(i.stock, i.unidad)}`);
+}
+
+function verLotesIngrediente(ingId){
+  const ingrediente = ing(ingId);
+  if(!ingrediente){ toast('Ingrediente no encontrado'); return; }
+  if(typeof obtenerDetalleLotesIngrediente !== 'function'){
+    toast('Detalle FIFO no disponible');
+    return;
+  }
+  const lotes = obtenerDetalleLotesIngrediente(ingId) || [];
+  const prev = document.getElementById('modal-lotes-fifo');
+  if(prev) prev.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'modal-lotes-fifo';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:760px">
+      <div class="modal-header">
+        <span class="modal-title">Lotes FIFO — ${ingrediente.nombre}</span>
+        <button class="modal-close" onclick="document.getElementById('modal-lotes-fifo').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:.78rem;color:var(--text3);margin-bottom:10px">
+          Stock actual: <strong>${formatCantidad(ingrediente.stock, ingrediente.unidad)}</strong>
+        </div>
+        ${lotes.length === 0 ? `
+          <p class="empty">Sin lotes registrados para este ingrediente.</p>
+        ` : `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Cantidad original</th>
+                  <th>Cantidad restante</th>
+                  <th>% restante</th>
+                  <th>Costo/u</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lotes.map(l => `
+                  <tr>
+                    <td>${l.fechaIngreso || '—'}</td>
+                    <td>${fmtN(l.cantidad,3)} ${ingrediente.unidad}</td>
+                    <td style="font-weight:600">${fmtN(l.cantidadRestante,3)} ${ingrediente.unidad}</td>
+                    <td>${l.porcentajeRestante}%</td>
+                    <td>${fmt(l.costoUnitario)}</td>
+                    <td><span class="badge badge-${l.estado==='activo'?'ok':'warn'}">${l.estado}</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 

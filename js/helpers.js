@@ -1,4 +1,4 @@
-// ══════════════ HELPERS DE DOM Y FORMATO ══════════════
+﻿// ══════════════ HELPERS DE DOM Y FORMATO ══════════════
 // Funciones utilitarias puras — sin efectos secundarios
 // Variables globales: globals.js | Fechas: timezone.js | Paginación: paginator.js
 
@@ -14,3 +14,12 @@ const prv       = id => proveedores.find(p => p.id == id);
 // Formateadores de valores numéricos
 const fmt  = n => (isNaN(n) || n === undefined) ? '—' : '$' + Number(n).toFixed(2);
 const fmtN = (n, d = 2) => (isNaN(n) || n === undefined) ? '—' : Number(n).toFixed(d);
+// Seguridad: escapar HTML para prevenir inyección
+function escapeHTML(value){
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

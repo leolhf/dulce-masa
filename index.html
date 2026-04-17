@@ -293,6 +293,7 @@
               <option value="fijo">Precio fijo</option>
               <option value="promedio">Precio promedio</option>
               <option value="ultimo">Última compra</option>
+              <option value="fifo">FIFO por lotes</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="abrirModalIng()">+ Agregar</button>
           </div>
@@ -535,6 +536,7 @@
               <option value="todo">Todo el historial</option>
             </select>
             <div id="fin-salud-badge" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer;border:1px solid var(--border)" onclick="showFinanzasTab('estadisticas')" title="Estado financiero general"></div>
+            <button class="btn btn-secondary btn-sm" onclick="exportarResumenFinancieroMensualCSV()" title="Exportar resumen financiero mensual">↓ Resumen CSV</button>
             <button class="btn btn-warning btn-sm" onclick="diagnosticarFinanzasCompras()" title="Diagnosticar compras en finanzas">🔍 Diag</button>
           </div>
         </div>
@@ -554,6 +556,7 @@
             <div style="font-size:.7rem;color:var(--text3);margin-bottom:2px" id="resumen-capital-total-det">Efectivo + Préstamos</div>
             <div style="font-size:.65rem;color:var(--text3);font-style:italic;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:12px;display:inline-block">Todo el historial</div>
           </div>
+          <div id="capital-origen-detalle" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px"></div>
           
           <!-- MÉTRICAS SECUNDARIAS -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
@@ -778,6 +781,16 @@
             <div class="card-body" id="analisis-proyecciones"></div>
           </div>
         </div>
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-header">
+            <span class="card-title" style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:1.1rem">🗓</span>
+              <span>Flujo de caja mensual</span>
+            </span>
+            <span style="font-size:.7rem;color:var(--text3);background:var(--cream2);padding:3px 8px;border-radius:12px">Ingresos - costos - gastos - préstamos - retiros</span>
+          </div>
+          <div class="card-body" id="analisis-flujo-mensual"></div>
+        </div>
 
         <!-- Gráfico de Evolución -->
         <div class="card">
@@ -786,7 +799,7 @@
               <span style="font-size:1.1rem">📊</span>
               <span>Evolución Financiera</span>
             </span>
-            <select class="search-input" id="analisis-periodo" onchange="renderAnalisisGrafico()" style="width:140px;font-size:.78rem">
+            <select class="search-input" id="analisis-periodo" onchange="renderAnalisisTab()" style="width:140px;font-size:.78rem">
               <option value="6meses">Últimos 6 meses</option>
               <option value="1ano">Último año</option>
               <option value="todo">Todo el historial</option>
@@ -1530,8 +1543,8 @@
             <div class="input-wrapper">
               <input type="text" id="compra-ing-input" class="field-input" 
                      placeholder="Buscar o escribir nombre del ingrediente..." 
-                     oninput="filtrarIngredientesCompra()" onfocus="mostrarSugerenciasIngredientes()" 
-                     onblur="ocultarSugerenciasIngredientes()" autocomplete="off">
+                     oninput="filtrarIngredientesCompra()" onfocus="mostrarSugerenciasIngredientesCompra()" 
+                     onblur="ocultarSugerenciasIngredientesCompra()" autocomplete="off">
               <input type="hidden" id="compra-ing" value="">
               <div id="sugerencias-compra-ing" class="sugerencias-lista" style="display:none"></div>
             </div>
@@ -1766,6 +1779,7 @@
 <script src="js/globals.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/paginator.js"></script>
+<script src="js/lotes-fifo.js"></script>
 
 <!-- ══ CAPA 1: Datos y persistencia ══ -->
 <script src="js/data-init.js"></script>

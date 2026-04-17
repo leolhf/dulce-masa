@@ -67,7 +67,7 @@ function renderVentas(){
   const opciones=recetas.map(r=>{
     const sp=stockProd(r.id);
     const stock=sp?sp.stock:0;
-    return [r.id, `${r.nombre} - Stock: ${stock} unidades`];
+    return [r.id, `${escapeHTML(r.nombre)} - Stock: ${stock} unidades`];
   }).filter(([_,label])=>!label.includes('Stock: 0'));
   fillSelect('venta-prod',opciones,'— Seleccionar —');
   // Solo resetear fecha si NO hay una edición en curso
@@ -79,7 +79,7 @@ function refreshVentaSelector(){
   const opciones=recetas.map(r=>{
     const sp=stockProd(r.id);
     const stock=sp?sp.stock:0;
-    return [r.id, `${r.nombre} - Stock: ${stock} unidades`];
+    return [r.id, `${escapeHTML(r.nombre)} - Stock: ${stock} unidades`];
   }).filter(([_,label])=>!label.includes('Stock: 0'));
   fillSelect('venta-prod',opciones,'— Seleccionar —');
 }
@@ -194,6 +194,7 @@ function registrarVenta(){
     const recetaOriginalId=original.recetaId;
     const spOriginal=stockProd(recetaOriginalId);
     const sp=stockProd(recetaId);
+    let diffUnidades = 0;
     if(recetaId !== recetaOriginalId){
       // Receta cambió: restaurar stock original y descontar del nuevo
       if(spOriginal) spOriginal.stock=Math.max(0,spOriginal.stock+original.unidades);
@@ -201,7 +202,7 @@ function registrarVenta(){
       if(unidades>stockDisp){toast(`Stock insuficiente para la nueva receta. Solo hay ${stockDisp} unidades disponibles`);return;}
       if(sp) sp.stock=Math.max(0,sp.stock-unidades);
     } else {
-      const diffUnidades=unidades-original.unidades;
+      diffUnidades=unidades-original.unidades;
       if(diffUnidades>0){const stockDisp=sp?sp.stock:0;if(diffUnidades>stockDisp){toast(`Stock insuficiente. Solo hay ${stockDisp} unidades disponibles`);return;}}
       if(sp)sp.stock=Math.max(0,sp.stock-diffUnidades);
     }

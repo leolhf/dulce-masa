@@ -18,10 +18,10 @@ function formatCantidad(stock, unidad){
 
 async function initializeData(){
   const DEF={
-    ingredientes:[],recetas:[],producciones:[],ventas:[],pedidos:[],
+    ingredientes:[],recetas:[],producciones:[],ventas:[],pedidos:[],lotesIngredientes:[],
     stockProductos:[],proveedores:[],historialCompras:[],extracciones:[],
     capital_ajustes: [],  // Agregar ajustes de capital
-    nextId:{ing:1,rec:1,prod:1,venta:1,prov:1,comp:1,pedido:1,ext:1}
+    nextId:{ing:1,rec:1,prod:1,venta:1,prov:1,comp:1,pedido:1,ext:1,lote:1}
   };
 
   // Si hay archivo vinculado, datos ya cargados desde el archivo
@@ -73,7 +73,11 @@ async function initializeData(){
       stockProductos  = saved.stockProductos  ||DEF.stockProductos;
       proveedores     = saved.proveedores     ||DEF.proveedores;
       historialCompras= saved.historialCompras||DEF.historialCompras;
+      lotesIngredientes= saved.lotesIngredientes||DEF.lotesIngredientes;
       capital_ajustes = saved.capital_ajustes || DEF.capital_ajustes;  // Cargar ajustes de capital
+      if (saved.capital_ajustes && Array.isArray(saved.capital_ajustes)) {
+        CapitalAdjustment.ajustes = saved.capital_ajustes;
+      }
       nextId          = saved.nextId          ||DEF.nextId;
       if(saved.catRecetas&&Array.isArray(saved.catRecetas)&&saved.catRecetas.length>0) catRecetas=saved.catRecetas;
       if(saved.gastosFijos&&Array.isArray(saved.gastosFijos))   gastosFijos=saved.gastosFijos;
@@ -84,13 +88,16 @@ async function initializeData(){
       ingredientes=DEF.ingredientes; recetas=DEF.recetas; producciones=DEF.producciones;
       ventas=DEF.ventas; pedidos=DEF.pedidos; stockProductos=DEF.stockProductos;
       proveedores=DEF.proveedores; historialCompras=DEF.historialCompras; nextId=DEF.nextId;
+      lotesIngredientes=DEF.lotesIngredientes;
       capital_ajustes = DEF.capital_ajustes;  // Cargar ajustes de capital por defecto
+      CapitalAdjustment.ajustes = DEF.capital_ajustes;
     }
   }catch(e){
     console.error('Error cargando datos desde IndexedDB:', e);
     ingredientes=DEF.ingredientes; recetas=DEF.recetas; producciones=DEF.producciones;
     ventas=DEF.ventas; pedidos=DEF.pedidos; stockProductos=DEF.stockProductos;
     proveedores=DEF.proveedores; historialCompras=DEF.historialCompras; nextId=DEF.nextId;
+    lotesIngredientes=DEF.lotesIngredientes;
   }
 
   // ── Asegurar nextId completo ──
@@ -104,6 +111,7 @@ async function initializeData(){
   nextId.pedido = nextId.pedido ||pedidos?.length+1||1;
   nextId.ext    = nextId.ext    ||1;
   nextId.prestamo=nextId.prestamo||1;
+  nextId.lote   = nextId.lote   ||1;
 
   // ── Sanear ids inválidos en historialCompras ──
   let _maxCompId=0, _idsSaneados=0;
@@ -125,6 +133,8 @@ async function initializeData(){
 // initializeData() se llamará después de cargar el handle del archivo
 
 function initApp(){
+  inicializarLotesDesdeStock();
+  sincronizarStockConLotes();
   updateAlertBadge();
   renderDashboard();
   inicializarStockProductos();
@@ -255,6 +265,12 @@ function obtenerPrecioPromedioIngrediente(ingId) {
       if (comprasUltimo.length === 0) return 0;
       const ultimaCompra = comprasUltimo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
       return ultimaCompra ? ultimaCompra.precio : 0;
+    case 'fifo':
+      // Usar costo promedio ponderado de lotes disponibles
+      if (typeof obtenerCostoPromedio === 'function') {
+        return obtenerCostoPromedio(ingId);
+      }
+      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
       
     default:
       return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;

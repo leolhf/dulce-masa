@@ -2,11 +2,12 @@
 // Extraído de helpers.js para separación de responsabilidades
 
 // Colecciones de datos — se inicializan en data-init.js / buildData()
-let ingredientes, recetas, producciones, ventas, pedidos, stockProductos, proveedores, historialCompras, nextId;
+let ingredientes, recetas, producciones, ventas, pedidos, stockProductos, proveedores, historialCompras, lotesIngredientes, nextId;
 let catRecetas = ['Tortas','Cupcakes','Galletas','Facturas','Panes','Alfajores','Otros'];
 let gastosFijos = [];    // {id, nombre, monto, periodo:'mensual'|'semanal'|'anual'}
 let extracciones = [];   // {id, fecha, monto, tipo, concepto, periodo}
 let prestamos;           // {id, fecha, prestamista, monto, concepto, devolver:bool, pctPorProduccion, pagos:[...]}
+let capital_ajustes = []; // Ajustes manuales de capital
 let metas = [];          // {id, nombre, tipo, objetivo, fechaLimite, nota, valorActual}
 
 // Variaciones temporales para producción actual
@@ -18,7 +19,7 @@ const TITLES = {
   dashboard: 'Panel general',
   inventario: 'Inventario de ingredientes',
   recetas: 'Recetas',
-  producción: 'Producción',
+  produccion: 'Producción',
   pedidos: 'Pedidos',
   costos: 'Análisis de costos',
   ventas: 'Ventas y ganancias',

@@ -148,6 +148,12 @@ function _gdriveDiff(local, drive){
     { key:'historialCompras',label:'Compras',           icon:'◷' },
     { key:'proveedores',     label:'Proveedores',       icon:'🏪' },
     { key:'stockProductos',  label:'Stock productos',   icon:'📦' },
+    { key:'lotesIngredientes',label:'Lotes FIFO',        icon:'▤' },
+    { key:'gastosFijos',     label:'Gastos fijos',       icon:'◼' },
+    { key:'extracciones',    label:'Retiros',            icon:'$' },
+    { key:'prestamos',       label:'Préstamos',          icon:'⇄' },
+    { key:'metas',           label:'Metas',              icon:'◎' },
+    { key:'capital_ajustes', label:'Ajustes capital',    icon:'◌' },
   ];
   const resumen = [];
   let hasDiff = false;
@@ -169,7 +175,8 @@ function _gdriveDiff(local, drive){
     const DATA_KEYS = [
       'ingredientes','recetas','producciones','ventas','pedidos',
       'historialCompras','proveedores','stockProductos',
-      'catRecetas','gastosFijos','extracciones','prestamos','metas'
+      'lotesIngredientes','catRecetas','gastosFijos','extracciones',
+      'prestamos','metas','capital_ajustes'
     ];
     const norm = obj => Object.fromEntries(DATA_KEYS.map(k => [k, obj[k] ?? []]));
     if(JSON.stringify(norm(local)) !== JSON.stringify(norm(drive))){
@@ -265,6 +272,12 @@ function _gdriveMostrarDetalle(key){
     historialCompras:{label:'Compras',         icon:'◷'},
     proveedores:    {label:'Proveedores',      icon:'🏪'},
     stockProductos: {label:'Stock productos',  icon:'📦'},
+    lotesIngredientes:{label:'Lotes FIFO',      icon:'▤'},
+    gastosFijos:    {label:'Gastos fijos',      icon:'◼'},
+    extracciones:   {label:'Retiros',           icon:'$'},
+    prestamos:      {label:'Préstamos',         icon:'⇄'},
+    metas:          {label:'Metas',             icon:'◎'},
+    capital_ajustes:{label:'Ajustes capital',   icon:'◌'},
   };
   const sec = secciones[key] || {label:key, icon:'·'};
 
@@ -272,13 +285,13 @@ function _gdriveMostrarDetalle(key){
   function _labelReg(r, src){
     if(!r) return '—';
     switch(key){
-      case 'ingredientes':   return `<strong>${r.nombre||'?'}</strong> · Stock: ${r.stock??'?'} ${r.unidad||''} · Precio: $${r.precio??'?'}`;
-      case 'recetas':        return `<strong>${r.nombre||'?'}</strong> · Cat: ${r.cat||'?'} · Rinde: ${r.rinde??'?'}`;
+      case 'ingredientes':   return `<strong>${escapeHTML(r.nombre||'?')}</strong> · Stock: ${r.stock??'?'} ${escapeHTML(r.unidad||'')} · Precio: $${r.precio??'?'}`;
+      case 'recetas':        return `<strong>${escapeHTML(r.nombre||'?')}</strong> · Cat: ${escapeHTML(r.cat||'?')} · Rinde: ${r.rinde??'?'}`;
       case 'producciones':   return `ID ${r.id} · ${r.fecha||'?'} · Receta: ${r.recetaId} · ${r.tandas??'?'} tandas`;
-      case 'pedidos':        return `<strong>${r.cliente||'?'}</strong> · ${r.fechaEntrega||'?'} · ${r.estado||'?'} · ${(r.items||[]).length} prod.`;
+      case 'pedidos':        return `<strong>${escapeHTML(r.cliente||'?')}</strong> · ${escapeHTML(r.fechaEntrega||'?')} · ${escapeHTML(r.estado||'?')} · ${(r.items||[]).length} prod.`;
       case 'ventas':         return `ID ${r.id} · ${r.fecha||'?'} · Receta: ${r.recetaId} · ${r.unidades??'?'} u · $${r.precio??'?'}`;
       case 'historialCompras': return `ID ${r.id} · ${r.fecha||'?'} · Ing: ${r.ingId} · ${r.qty??'?'} u · $${r.precio??'?'}`;
-      case 'proveedores':    return `<strong>${r.nombre||'?'}</strong> · Tel: ${r.tel||'—'} · ${r.productos||'—'}`;
+      case 'proveedores':    return `<strong>${escapeHTML(r.nombre||'?')}</strong> · Tel: ${escapeHTML(r.tel||'—')} · ${escapeHTML(r.productos||'—')}`;
       case 'stockProductos': return `Receta: ${r.recetaId} · Stock: ${r.stock??'?'} · Total: ${r.total??'?'}`;
       default: return JSON.stringify(r).slice(0,80);
     }
@@ -400,7 +413,8 @@ async function gdriveFusionar(){
       const secciones = [
         'ingredientes','recetas','producciones','ventas','pedidos',
         'historialCompras','proveedores','stockProductos',
-        'catRecetas','gastosFijos','extracciones','prestamos'
+        'lotesIngredientes','catRecetas','gastosFijos','extracciones',
+        'prestamos','metas','capital_ajustes'
       ];
 
       const merged = Object.assign({}, local);
@@ -432,7 +446,7 @@ async function gdriveFusionar(){
       const localNext = local.nextId || {};
       const driveNext = drive.nextId || {};
       merged.nextId = {};
-      ['ing','rec','prod','venta','comp','prov','pedido','ext','prestamo'].forEach(k => {
+      ['ing','rec','prod','venta','comp','prov','pedido','ext','prestamo','lote'].forEach(k => {
         merged.nextId[k] = Math.max(localNext[k]||1, driveNext[k]||1);
       });
 

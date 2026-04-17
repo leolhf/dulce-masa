@@ -118,6 +118,66 @@ function _finMetricas(periodo){
   };
 }
 
+function _finGastoFijoMensualBase(){
+  return (gastosFijos || []).reduce((a, g) => {
+    if (g.periodo === 'mensual') return a + g.monto;
+    if (g.periodo === 'semanal') return a + g.monto * 4.33;
+    if (g.periodo === 'anual') return a + g.monto / 12;
+    return a;
+  }, 0);
+}
+
+function _finSerieMensual(meses = 6){
+  const base = [];
+  for(let i = meses - 1; i >= 0; i--){
+    const ini = inicioMes(-i);
+    const fin = finMes(-i);
+    const key = _tzDateStr(ini).slice(0,7);
+    base.push({
+      key,
+      ini,
+      fin,
+      label: formatDateWithTimezone(ini, { format: 'month-year' }),
+      ingresos: 0,
+      costosIngredientes: 0,
+      gastosFijos: _finGastoFijoMensualBase(),
+      prestamosEntrantes: 0,
+      extracciones: 0,
+      flujoNeto: 0
+    });
+  }
+
+  const buscarMes = fecha => {
+    const d = createDate(fecha);
+    if(!d) return null;
+    const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    return base.find(m => m.key === k) || null;
+  };
+
+  (ventas || []).forEach(v => {
+    const m = buscarMes(v.fecha);
+    if(!m) return;
+    m.ingresos += v.unidades * v.precio + (v.propina || 0);
+    const r = rec(v.recetaId);
+    m.costosIngredientes += (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
+  });
+
+  (extracciones || []).forEach(e => {
+    const m = buscarMes(e.fecha);
+    if(m) m.extracciones += e.monto || 0;
+  });
+
+  (prestamos || []).forEach(p => {
+    const m = buscarMes(p.fecha);
+    if(m) m.prestamosEntrantes += p.monto || 0;
+  });
+
+  base.forEach(m => {
+    m.flujoNeto = m.ingresos - m.costosIngredientes - m.gastosFijos + m.prestamosEntrantes - m.extracciones;
+  });
+  return base;
+}
+
 // ──// Toggle detalles KPI (eliminado - los Indicadores Detallados fueron removidos)
 // La función toggleKPIDetails() ha sido eliminada para simplificar la interfaz
 
@@ -147,7 +207,7 @@ function renderFinanzas(){
   updateElement('resumen-ingresos', fmt(m.ingresosTotal));
   updateElement('resumen-ingresos-det', `${m.nVentas || 0} ventas`);
   updateElement('resumen-gastos', fmt(m.gastosTotales));
-  updateElement('resumen-gastos-det', `${fmt(m.costoCompras)} compras + ${fmt(m.costosVariables + m.gastosFijosMes)} operativos`);
+  updateElement('resumen-gastos-det', `${fmt(m.costosVariables)} ingredientes + ${fmt(m.gastosFijosMes)} fijos + ${fmt(m.costoCompras)} compras`);
   updateElement('resumen-flujo', fmt(m.flujoBruto));
   updateElement('resumen-disponible', fmt(m.disponible));
   updateElement('resumen-disponible-det', `Para retiros`);
@@ -196,6 +256,28 @@ function renderFinanzas(){
     const valEl = tarjCapital.querySelector('.resumen-capital-valor');
     if (valEl) valEl.style.color = capitalHistorico >= 0 ? 'var(--ok)' : 'var(--danger)';
   }
+  updateHTML('capital-origen-detalle', `
+    <div style="padding:9px 10px;border:1px solid var(--border2);border-radius:10px;background:var(--cream2)">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Ingresos acumulados</div>
+      <div style="font-weight:700;color:var(--ok)">${fmt(mTodo.ingresosTotal)}</div>
+    </div>
+    <div style="padding:9px 10px;border:1px solid var(--border2);border-radius:10px;background:var(--cream2)">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Costos ingredientes</div>
+      <div style="font-weight:700;color:var(--danger)">-${fmt(mTodo.costosVariables)}</div>
+    </div>
+    <div style="padding:9px 10px;border:1px solid var(--border2);border-radius:10px;background:var(--cream2)">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Gastos fijos</div>
+      <div style="font-weight:700;color:var(--danger)">-${fmt(mTodo.gastosFijosMes)}</div>
+    </div>
+    <div style="padding:9px 10px;border:1px solid var(--border2);border-radius:10px;background:var(--cream2)">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Extracciones</div>
+      <div style="font-weight:700;color:var(--danger)">-${fmt(mTodo.totalExtraido)}</div>
+    </div>
+    <div style="padding:9px 10px;border:1px solid var(--border2);border-radius:10px;background:var(--cream2)">
+      <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Préstamos no devolutivos</div>
+      <div style="font-weight:700;color:var(--caramel)">+${fmt(mTodo.prestamosSinDevolucion)}</div>
+    </div>
+  `);
   // Exponer para Ajuste Capital
   window._capitalHistoricoActual = mTodo.capitalTotal;
 

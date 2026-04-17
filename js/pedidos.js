@@ -17,7 +17,7 @@ function setPedidosVista(v){
 }
 
 function renderPedidos(){
-  fillSelect('pedido-prod', recetas.map(r=>[r.id,r.nombre]), '— Seleccionar —');
+  fillSelect('pedido-prod', recetas.map(r=>[r.id,escapeHTML(r.nombre)]), '— Seleccionar —');
   $('pedido-fecha').value = today();
   _renderAlerta48h();
   renderPedidosActivos();
@@ -51,10 +51,10 @@ function _renderAlerta48h(){
           const diffTxt = diff === 0 ? '¡Hoy!' : diff === 1 ? 'Mañana' : `En ${diff} días`;
           const total = (p.items||[]).reduce((a,it)=>a+it.cantidad*it.precio,0);
           return `<div style="background:var(--white);border:1px solid #E8BFBE;border-radius:7px;padding:7px 11px;font-size:.8rem">
-            <span style="font-weight:600">${p.cliente}</span>
+            <span style="font-weight:600">${escapeHTML(p.cliente)}</span>
             <span style="color:var(--danger);font-weight:500;margin-left:6px">${diffTxt}</span>
             <span style="color:var(--text3);margin-left:6px">${fmt(total)}</span>
-            <span style="margin-left:6px;font-size:.73rem;color:var(--text3)">${(p.items||[]).map(it=>rec(it.recetaId)?.nombre||'?').join(', ')}</span>
+            <span style="margin-left:6px;font-size:.73rem;color:var(--text3)">${(p.items||[]).map(it=>escapeHTML(rec(it.recetaId)?.nombre||'?')).join(', ')}</span>
           </div>`;
         }).join('')}
       </div>
@@ -107,8 +107,8 @@ function renderPedidosActivos(){
     return `<div style="border:1px solid ${borderColor};border-radius:var(--r);padding:12px;margin-bottom:8px;background:${bgColor}">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:7px">
         <div>
-          <div style="font-weight:600;font-size:.95rem">${p.cliente}</div>
-          <div style="font-size:.75rem;color:var(--text3)">${p.telefono||''}${p.email?' · '+p.email:''}</div>
+          <div style="font-weight:600;font-size:.95rem">${escapeHTML(p.cliente)}</div>
+          <div style="font-size:.75rem;color:var(--text3)">${escapeHTML(p.telefono||'')}${p.email?' · '+escapeHTML(p.email):''}</div>
         </div>
         <span class="badge badge-${estadoColors[p.estado]}">${estadoLabels[p.estado]}</span>
       </div>
@@ -117,7 +117,7 @@ function renderPedidosActivos(){
         <span>Saldo: <strong style="color:var(--${saldo>0?'danger':'ok'})">${fmt(saldo)}</strong></span>
       </div>
       <div style="font-size:.75rem;color:var(--text3);margin-bottom:9px">
-        ${(p.items||[]).map(it=>`${rec(it.recetaId)?.nombre||'?'} ×${it.cantidad}`).join(' · ')}
+        ${(p.items||[]).map(it=>`${escapeHTML(rec(it.recetaId)?.nombre||'?')} ×${it.cantidad}`).join(' · ')}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${p.estado==='pendiente' ? `<button class="btn btn-primary btn-sm" data-id="${p.id}" onclick="actualizarEstadoPedido(+this.dataset.id,'listo')">✓ Listo</button>` : ''}
@@ -152,10 +152,10 @@ function renderPedidosTable(){
 
   tb.innerHTML=pagina.map(p=>{
     const tot=p.items.reduce((a,item)=>a+item.cantidad*item.precio,0);
-    const productos=p.items.map(item=>`${rec(item.recetaId)?.nombre||'?'} x${item.cantidad}`).join(', ');
+    const productos=p.items.map(item=>`${escapeHTML(rec(item.recetaId)?.nombre||'?')} x${item.cantidad}`).join(', ');
     return`<tr>
       <td>${p.fecha}</td>
-      <td style="font-weight:500">${p.cliente}</td>
+      <td style="font-weight:500">${escapeHTML(p.cliente)}</td>
       <td style="font-size:.78rem;color:var(--text3)">${productos}</td>
       <td>${fmt(tot)}</td>
       <td>${fmt(p.anticipo)}</td>
@@ -196,8 +196,8 @@ function actualizarItemsPedido(){
   
   el.innerHTML=pedidoActual.map((item,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--cream);border-radius:var(--r);margin-bottom:4px">
     <div style="flex:1">
-      <div style="font-size:.85rem;font-weight:500">${rec(item.recetaId)?.nombre||'?'}</div>
-      <div style="font-size:.73rem;color:var(--text3)">${item.cantidad} x ${fmt(item.precio)}${item.notas?' · '+item.notas:''}</div>
+      <div style="font-size:.85rem;font-weight:500">${escapeHTML(rec(item.recetaId)?.nombre||'?')}</div>
+      <div style="font-size:.73rem;color:var(--text3)">${item.cantidad} x ${fmt(item.precio)}${item.notas?' · '+escapeHTML(item.notas):''}</div>
     </div>
     <button class="btn btn-danger btn-sm btn-icon" onclick="removerItemPedido(${i})" style="margin-left:8px">✕</button>
   </div>`).join('');
@@ -288,7 +288,7 @@ function actualizarEstadoPedido(id,nuevoEstado){
       const disponible=sp?sp.stock:0;
       if(disponible<item.cantidad){
         const r=rec(item.recetaId);
-        sinStock.push(`• ${r?r.nombre:'?'}: necesita ${item.cantidad}, hay ${disponible}`);
+        sinStock.push(`• ${escapeHTML(r?r.nombre:'?')}: necesita ${item.cantidad}, hay ${disponible}`);
       }
     });
 
@@ -346,7 +346,7 @@ function actualizarEstadoPedido(id,nuevoEstado){
         precio:item.precio,
         propina:0,
         canal:'encargo',
-        nota:`Pedido #${p.id}: ${p.cliente}`
+        nota:`Pedido #${p.id}: ${escapeHTML(p.cliente)}`
       });
     });
     p.estado='entregado';
@@ -373,14 +373,14 @@ function verPedido(id){
   
   const total=p.items.reduce((a,item)=>a+item.cantidad*item.precio,0);
   const itemsHtml=p.items.map(item=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border2)">
-    <div>${rec(item.recetaId)?.nombre||'?'} x${item.cantidad}</div>
+    <div>${escapeHTML(rec(item.recetaId)?.nombre||'?')} x${item.cantidad}</div>
     <div>${fmt(item.cantidad*item.precio)}</div>
   </div>`).join('');
   
   openModal('modal-ver-pedido');
   $('modal-ver-pedido-inner').innerHTML=`
     <div class="modal-header">
-      <span class="modal-title">Pedido #${id} - ${p.cliente}</span>
+      <span class="modal-title">Pedido #${id} - ${escapeHTML(p.cliente)}</span>
       <button class="modal-close" onclick="closeModal('modal-ver-pedido')">✕</button>
     </div>
     <div class="modal-body">
@@ -413,7 +413,7 @@ function verPedido(id){
         <span style="color:var(--${total-p.anticipo>0?'danger':'ok'})">${fmt(total-p.anticipo)}</span>
       </div>
       
-      ${p.notas?`<div style="margin-bottom:16px"><strong>Notas:</strong> ${p.notas}</div>`:''}
+      ${p.notas?`<div style="margin-bottom:16px"><strong>Notas:</strong> ${escapeHTML(p.notas)}</div>`:''}
       
       <div style="text-align:center;margin-bottom:12px">
         <span class="badge badge-${p.estado==='pendiente'?'warn':p.estado==='listo'?'caramel':p.estado==='entregado_sin_cobrar'?'warn':'text3'}">
@@ -483,7 +483,7 @@ function _mostrarModalEntrega(id){
   overlay.innerHTML = `
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <span class="modal-title">📦 Entregar pedido — ${p.cliente}</span>
+        <span class="modal-title">📦 Entregar pedido — ${escapeHTML(p.cliente)}</span>
         <button class="modal-close" onclick="document.getElementById('modal-entrega-cobro').remove()">✕</button>
       </div>
       <div class="modal-body">

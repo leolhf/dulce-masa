@@ -68,11 +68,20 @@ function renderAnalisisTab() {
   });
 
   const ventasP  = inRng(ventas);
-  const comprasP = inRng(historialCompras);
+  const extP     = inRng(extracciones);
 
   const totalIngresos = ventasP.reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
-  const totalEgresos  = comprasP.reduce((a,c) => a + c.qty*c.precio, 0);
-  const flujoNeto     = totalIngresos - totalEgresos;
+  const costoIngredientes = ventasP.reduce((a,v) => {
+    const r = rec(v.recetaId);
+    return a + (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
+  }, 0);
+  const gastoFijoMensual = _finGastoFijoMensualBase();
+  const mesesPeriodo = Math.max(1, Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24 * 30)));
+  const gastosFijosPeriodo = gastoFijoMensual * mesesPeriodo;
+  const totalExtracciones = extP.reduce((a,e) => a + (e.monto || 0), 0);
+  const prestamosEntrantes = inRng(prestamos || []).reduce((a,p) => a + (p.monto || 0), 0);
+  const totalEgresos  = costoIngredientes + gastosFijosPeriodo + totalExtracciones;
+  const flujoNeto     = totalIngresos - totalEgresos + prestamosEntrantes;
   const margenPct     = totalIngresos > 0 ? Math.round(flujoNeto/totalIngresos*100) : 0;
 
   const diasMes   = parseInt(_tzDateStr(finMes(0)).split('-')[2]);
@@ -96,10 +105,16 @@ function renderAnalisisTab() {
           <div style="font-size:.7rem;color:var(--text3);margin-top:3px">${ventasP.length} ventas</div>
         </div>
         <div style="text-align:center;padding:14px;background:var(--danger-bg);border-radius:var(--r);border:1px solid var(--danger)">
-          <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">💸 Egresos</div>
+          <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">💸 Egresos operativos</div>
           <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;color:var(--danger)">${fmt(totalEgresos)}</div>
-          <div style="font-size:.7rem;color:var(--text3);margin-top:3px">${comprasP.length} compras</div>
+          <div style="font-size:.7rem;color:var(--text3);margin-top:3px">incluye retiros</div>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px">
+        <div style="padding:9px;background:var(--cream);border-radius:var(--r);font-size:.78rem"><strong>Ingredientes:</strong> ${fmt(costoIngredientes)}</div>
+        <div style="padding:9px;background:var(--cream);border-radius:var(--r);font-size:.78rem"><strong>Gastos fijos:</strong> ${fmt(gastosFijosPeriodo)}</div>
+        <div style="padding:9px;background:var(--cream);border-radius:var(--r);font-size:.78rem"><strong>Extracciones:</strong> ${fmt(totalExtracciones)}</div>
+        <div style="padding:9px;background:var(--cream);border-radius:var(--r);font-size:.78rem"><strong>Préstamos:</strong> ${fmt(prestamosEntrantes)}</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--cream);border-radius:var(--r);border:1px solid var(--border)">
         <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">📈 Flujo neto del período</div>
@@ -110,6 +125,9 @@ function renderAnalisisTab() {
 
   const analisisProyecciones = document.getElementById('analisis-proyecciones');
   if (analisisProyecciones) {
+    const precioPromedio = ventasP.reduce((a,v)=>a+(v.precio||0),0) / Math.max(1, ventasP.length);
+    const contribucionUnitaria = Math.max(0.01, precioPromedio - (ventasP.length>0 ? costoIngredientes / Math.max(1, ventasP.reduce((a,v)=>a+(v.unidades||0),0)) : 0));
+    const puntoEquilibrioUnidades = Math.ceil(gastoFijoMensual / contribucionUnitaria);
     analisisProyecciones.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div style="text-align:center;padding:14px;background:var(--ok-bg);border-radius:var(--r)">
@@ -125,7 +143,48 @@ function renderAnalisisTab() {
       </div>
       <div style="font-size:.76rem;color:var(--text3);padding:10px;background:var(--cream);border-radius:var(--r);text-align:center">
         Quedan <strong>${diasRest}</strong> días en el mes · Ingresos hasta hoy: <strong>${fmt(ingMes)}</strong>
+      </div>
+      <div style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:var(--r);background:var(--cream2)">
+        <div style="font-size:.73rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Punto de equilibrio mensual</div>
+        <div style="font-size:1.4rem;font-family:'Playfair Display',serif;font-weight:700;color:var(--${puntoEquilibrioUnidades>0?'caramel':'text2'})">${puntoEquilibrioUnidades} unidades</div>
+        <div style="font-size:.74rem;color:var(--text3)">Cubre gastos fijos de ${fmt(gastoFijoMensual)} con contribución de ${fmt(contribucionUnitaria)}/u</div>
       </div>`;
+  }
+
+  const flujoMensual = $('analisis-flujo-mensual');
+  if (flujoMensual) {
+    const serie = _finSerieMensual(6);
+    if (serie.length === 0) {
+      flujoMensual.innerHTML = '<p class="empty">Sin datos mensuales.</p>';
+    } else {
+      flujoMensual.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Ingresos</th>
+                <th>Ingredientes</th>
+                <th>Gastos fijos</th>
+                <th>Préstamos</th>
+                <th>Extracciones</th>
+                <th>Flujo neto</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${serie.map(m => `<tr>
+                <td>${m.label}</td>
+                <td>${fmt(m.ingresos)}</td>
+                <td>${fmt(m.costosIngredientes)}</td>
+                <td>${fmt(m.gastosFijos)}</td>
+                <td>${fmt(m.prestamosEntrantes)}</td>
+                <td>${fmt(m.extracciones)}</td>
+                <td style="font-weight:700;color:var(--${m.flujoNeto>=0?'ok':'danger'})">${fmt(m.flujoNeto)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
   }
 }
 

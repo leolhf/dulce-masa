@@ -965,12 +965,12 @@ async function sincronizar(){
     let subioExitoso = false;
     let tsSubida = null;
 
-    // 1. Subir pendientes primero
     if(_pendiente.length > 0 && _data){
-      _aplicarPendientes();
-      // Marcar timestamp ANTES de subir: Drive y local quedan con el mismo ts
+      const driveData = await _cargarDriveSilencioso();
+      const base = _normalizarDataset(driveData || _data);
+      _aplicarPendientesSobre(base);
       tsSubida = _nowISOLocal();
-      const payload = Object.assign({}, _data, { _guardado: tsSubida, _version: 2 });
+      const payload = Object.assign({}, base, { _guardado: tsSubida, _version: 2 });
       const res = await fetch(_gasUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -979,7 +979,7 @@ async function sincronizar(){
       if(!res.ok) throw new Error('HTTP ' + res.status);
       const r = await res.json();
       if(r.status === 'ok'){
-        _data      = payload;  // fuente de verdad = lo que acabamos de subir
+        _data      = payload;
         _pendiente = [];
         _lastSync  = tsSubida;
         await _guardarCacheIDB();
@@ -1033,8 +1033,10 @@ async function subirADrive(){
   const btn = document.getElementById('btn-subir');
   if(btn){ btn.disabled = true; btn.textContent = 'Subiendo…'; }
   try {
-    _aplicarPendientes();
-    const payload = Object.assign({}, _data, {
+    const driveData = _pendiente.length ? await _cargarDriveSilencioso() : null;
+    const base = _normalizarDataset(_pendiente.length ? (driveData || _data) : _data);
+    if(_pendiente.length) _aplicarPendientesSobre(base);
+    const payload = Object.assign({}, base, {
       _version:  2,
       _guardado: _nowISOLocal()
     });
@@ -1137,8 +1139,171 @@ async function _guardarPendiente(op){
 // Mapa entre nombre de colección y clave en nextId (igual que index.html / buildData)
 const _NEXTID_KEY_MAP = {
   ventas: 'venta', pedidos: 'pedido', historialCompras: 'comp',
-  ingredientes: 'ing', proveedores: 'prov', recetas: 'rec', producciones: 'prod'
+  ingredientes: 'ing', proveedores: 'prov', recetas: 'rec', producciones: 'prod',
+  extracciones: 'ext', prestamos: 'prestamo', lotesIngredientes: 'lote'
 };
+
+const _SYNC_ARRAYS = [
+  'ingredientes','recetas','producciones','ventas','pedidos','stockProductos',
+  'proveedores','historialCompras','lotesIngredientes','catRecetas','gastosFijos',
+  'extracciones','prestamos','metas','capital_ajustes'
+];
+
+async function _cargarDriveSilencioso(){
+  if(!_gasUrl) return null;
+  try{
+    const res = await fetch(_gasUrl + '?action=load&t=' + Date.now());
+    if(!res.ok) return null;
+    const r = await res.json();
+    if(!r || !r.data) return null;
+    return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+  }catch(e){
+    return null;
+  }
+}
+
+function _clonar(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function _jsonIgual(a, b){
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function _normalizarDataset(data){
+  const d = _clonar(data || {});
+  _SYNC_ARRAYS.forEach(k => { if(!Array.isArray(d[k])) d[k] = []; });
+  if(!d.nextId) d.nextId = {};
+  Object.keys(_NEXTID_KEY_MAP).forEach(k => _syncNextIdFor(d, k));
+  return d;
+}
+
+function _syncNextIdFor(data, coleccion){
+  if(!data.nextId) data.nextId = {};
+  const key = _NEXTID_KEY_MAP[coleccion];
+  if(!key) return;
+  const arr = Array.isArray(data[coleccion]) ? data[coleccion] : [];
+  const maxId = arr.reduce((m, x) => Math.max(m, Number(x?.id) || 0), 0);
+  data.nextId[key] = Math.max(Number(data.nextId[key]) || 1, maxId + 1);
+}
+
+function _safeNextIdFor(data, coleccion){
+  _syncNextIdFor(data, coleccion);
+  const key = _NEXTID_KEY_MAP[coleccion];
+  const arr = Array.isArray(data[coleccion]) ? data[coleccion] : [];
+  let id = Math.max(Number(data.nextId?.[key]) || 1, arr.reduce((m, x) => Math.max(m, Number(x?.id) || 0), 0) + 1);
+  while(arr.some(x => Number(x?.id) === id)) id++;
+  if(key) data.nextId[key] = id + 1;
+  return id;
+}
+
+function _asegurarArray(data, coleccion){
+  if(!Array.isArray(data[coleccion])) data[coleccion] = [];
+  return data[coleccion];
+}
+
+function _insertarRegistroUnico(data, coleccion, registro){
+  if(!registro) return { registro:null, insertado:false, idOriginal:null };
+  const arr = _asegurarArray(data, coleccion);
+  const copia = _clonar(registro);
+  const idOriginal = copia.id;
+  const existente = arr.find(x => x?.id == copia.id);
+  if(existente){
+    if(_jsonIgual(existente, copia)) return { registro:existente, insertado:false, idOriginal };
+    copia.id = _safeNextIdFor(data, coleccion);
+  }
+  arr.push(copia);
+  _syncNextIdFor(data, coleccion);
+  return { registro:copia, insertado:true, idOriginal };
+}
+
+function _asegurarRegistroLocalEnBase(data, coleccion, id){
+  if(id == null || !_data) return id;
+  const local = (_data[coleccion] || []).find(x => x?.id == id);
+  if(!local) return id;
+  const arr = _asegurarArray(data, coleccion);
+  const existente = arr.find(x => x?.id == id);
+  if(!existente){
+    arr.push(_clonar(local));
+    _syncNextIdFor(data, coleccion);
+    return id;
+  }
+  if(_jsonIgual(existente, local)) return existente.id;
+  return _insertarRegistroUnico(data, coleccion, local).registro.id;
+}
+
+function _descontarStockProductoEn(data, recetaId, unidades){
+  const sp = (data.stockProductos || []).find(s => s.recetaId == recetaId);
+  if(sp) sp.stock = Math.max(0, Number(sp.stock || 0) - Number(unidades || 0));
+}
+
+function _sumarStockIngredienteEn(data, ingId, qty, precio){
+  const ing = (data.ingredientes || []).find(i => i.id == ingId);
+  if(ing){
+    ing.stock = +(Number(ing.stock || 0) + Number(qty || 0)).toFixed(4);
+    if(Number(precio) > 0) ing.precio = precio;
+  }
+}
+
+function _aplicarPendientesSobre(data){
+  const idMap = { pedidos:{}, ventas:{}, historialCompras:{}, ingredientes:{}, proveedores:{} };
+  _pendiente.forEach(op => {
+    if(op.type === 'venta'){
+      const res = _insertarRegistroUnico(data, 'ventas', op.data);
+      if(res.idOriginal !== res.registro?.id) idMap.ventas[res.idOriginal] = res.registro.id;
+      if(res.insertado) _descontarStockProductoEn(data, res.registro.recetaId, res.registro.unidades);
+    }
+
+    if(op.type === 'compra'){
+      const compra = _clonar(op.data);
+      const ingOriginal = compra.ingId;
+      const provOriginal = compra.provId;
+      compra.ingId = _asegurarRegistroLocalEnBase(data, 'ingredientes', compra.ingId);
+      compra.provId = _asegurarRegistroLocalEnBase(data, 'proveedores', compra.provId);
+      if(ingOriginal != compra.ingId) idMap.ingredientes[ingOriginal] = compra.ingId;
+      if(provOriginal != compra.provId) idMap.proveedores[provOriginal] = compra.provId;
+      const res = _insertarRegistroUnico(data, 'historialCompras', compra);
+      if(res.idOriginal !== res.registro?.id) idMap.historialCompras[res.idOriginal] = res.registro.id;
+      if(res.insertado) _sumarStockIngredienteEn(data, res.registro.ingId, res.registro.qty, res.registro.precio);
+    }
+
+    if(op.type === 'nuevo_pedido'){
+      const res = _insertarRegistroUnico(data, 'pedidos', op.data);
+      if(res.idOriginal !== res.registro?.id) idMap.pedidos[res.idOriginal] = res.registro.id;
+    }
+
+    if(op.type === 'pedido_estado'){
+      const pedidoId = idMap.pedidos[op.id] || op.id;
+      let p = (data.pedidos || []).find(pe => pe.id == pedidoId);
+      if(!p && _data){
+        const localPedido = (_data.pedidos || []).find(pe => pe.id == op.id);
+        const res = _insertarRegistroUnico(data, 'pedidos', localPedido);
+        p = res.registro;
+        if(res.idOriginal !== res.registro?.id) idMap.pedidos[res.idOriginal] = res.registro.id;
+      }
+      if(p){
+        const estadoAnterior = p.estado;
+        if(op.estado === 'listo' && estadoAnterior !== 'listo'){
+          (p.items || []).forEach(item => _descontarStockProductoEn(data, item.recetaId, item.cantidad));
+        }
+        p.estado = op.estado;
+        if(op.fechaEntregaReal) p.fechaEntregaReal = op.fechaEntregaReal;
+        if(op.fechaCobro) p.fechaCobro = op.fechaCobro;
+        if(op.ventaIds) p.ventaIds = op.ventaIds;
+        if(op.estado === 'entregado' && op.ventas){
+          if(!p.ventaIds) p.ventaIds = [];
+          op.ventas.forEach(v => {
+            const res = _insertarRegistroUnico(data, 'ventas', v);
+            if(res.insertado && !p.ventaIds.includes(res.registro.id)) p.ventaIds.push(res.registro.id);
+            if(res.idOriginal !== res.registro?.id) idMap.ventas[res.idOriginal] = res.registro.id;
+          });
+        }
+      }
+    }
+  });
+  Object.keys(_NEXTID_KEY_MAP).forEach(k => _syncNextIdFor(data, k));
+}
+
 function _nextId(coleccion){
   if(!_data) return Date.now();
   const arr = _data[coleccion] || [];
@@ -1227,7 +1392,7 @@ function renderVentasMovil(){
       if(!r) return;
       const opt = document.createElement('option');
       opt.value = r.id;
-      opt.textContent = `${r.nombre} (${sp.stock} disp.)`;
+      opt.textContent = `${escapeHTML(r.nombre)} (${sp.stock} disp.)`;
       if(String(r.id) === cur) opt.selected = true;
       sel.appendChild(opt);
     });
@@ -1326,8 +1491,8 @@ function renderVentasHoy(){
     return `<div class="list-item">
       <div class="li-icon" style="background:var(--ok-bg)">💰</div>
       <div class="li-body">
-        <div class="li-title">${r ? r.nombre : '?'} ×${v.unidades} ${esPendiente ? '<span style="color:var(--warn);font-size:.7rem"> ⏳</span>' : ''}</div>
-        <div class="li-sub">${v.canal||'directo'}${v.nota ? ' · ' + v.nota : ''}</div>
+        <div class="li-title">${r ? escapeHTML(r.nombre) : '?'} ×${v.unidades} ${esPendiente ? '<span style="color:var(--warn);font-size:.7rem"> ⏳</span>' : ''}</div>
+        <div class="li-sub">${escapeHTML(v.canal||'directo')}${v.nota ? ' · ' + escapeHTML(v.nota) : ''}</div>
       </div>
       <div class="li-right">
         <div class="li-val">${fmt(v.unidades * v.precio)}</div>
@@ -1416,7 +1581,7 @@ function _renderNpItems(){
   const total = _npItems.reduce((a,it) => a + it.cantidad * it.precio, 0);
   cont.innerHTML = _npItems.map((it, idx) =>
     `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1;font-size:.9rem">${it.nombre} <span style="color:var(--text3)">×${it.cantidad}</span></div>
+      <div style="flex:1;font-size:.9rem">${escapeHTML(it.nombre)} <span style="color:var(--text3)">×${it.cantidad}</span></div>
       <div style="color:var(--caramel2);font-size:.9rem">${fmt(it.cantidad * it.precio)}</div>
       <button onclick="_npItems.splice(${idx},1);_renderNpItems()" style="background:none;border:none;color:var(--danger);font-size:1rem;cursor:pointer;padding:4px">✕</button>
     </div>`
@@ -1455,7 +1620,7 @@ async function registrarPedidoMovil(){
 
   _mostrarFormPedido(false);
   renderPedidosMovil();
-  toast(`✓ Pedido de ${cliente} creado`);
+  toast(`✓ Pedido de ${escapeHTML(cliente)} creado`);
 }
 
 function renderPedidosMovil(){

@@ -117,13 +117,13 @@ function buildData(){
     _version: 2,
     _guardado: nowISOLocal(),  // timezone.js — ISO con offset local, no UTC
     ingredientes, recetas, producciones, ventas, pedidos,
-    stockProductos, proveedores, historialCompras, catRecetas, gastosFijos, extracciones, prestamos, metas,
+    stockProductos, proveedores, historialCompras, lotesIngredientes, catRecetas, gastosFijos, extracciones, prestamos, metas,
     capital_ajustes: CapitalAdjustment.ajustes,  // Agregar ajustes de capital
     nextId:{
       ing:nextId?.ing||1, rec:nextId?.rec||1, prod:nextId?.prod||1,
       venta:nextId?.venta||1, comp:nextId?.comp||1,
       prov:nextId?.prov||1, pedido:nextId?.pedido||pedidos?.length+1||1,
-      ext:nextId?.ext||1, prestamo:nextId?.prestamo||1
+      ext:nextId?.ext||1, prestamo:nextId?.prestamo||1, lote:nextId?.lote||1
     }
   };
 }
@@ -191,32 +191,6 @@ async function _escribirArchivo(mostrarToast=true){
     actualizarUIArchivo(_fileHandle.name, false, 'Error al escribir');
   }
   _guardandoArchivo = false;
-}
-
-// ── Elegir / crear archivo de guardado ──
-async function elegirArchivoGuardado(){
-  if(!('showSaveFilePicker' in window)){
-    toast('Tu navegador no soporta File System Access API. Usa Chrome/Edge.');
-    return;
-  }
-  try{
-    const h = await window.showSaveFilePicker({
-      suggestedName: 'dulce-y-masa.json',
-      types:[{description:'Archivo de datos JSON', accept:{'application/json':['.json']}}]
-    });
-    _fileHandle = h;
-    // Persistir en IndexedDB
-    try{
-      const db = await abrirDB();
-      await dbSet(db,'fileHandle',h);
-    }catch(e){ console.warn('No se pudo persistir handle en IndexedDB:',e); }
-    // Guardar inmediatamente
-    await _escribirArchivo(false);
-    toast('📁 Archivo vinculado y guardado ✓');
-    actualizarUIArchivo(h.name, true);
-  }catch(e){
-    if(e.name!=='AbortError') toast('No se pudo vincular el archivo');
-  }
 }
 
 // ── Guardar ahora manualmente ──
@@ -299,6 +273,10 @@ function handleBotonVincular(){
 
 // ── Elegir archivo guardado ──
 async function elegirArchivoGuardado(){
+  if(!('showSaveFilePicker' in window)){
+    toast('Tu navegador no soporta File System Access API. Usa Chrome/Edge.');
+    return;
+  }
   try{
     const h = await window.showSaveFilePicker({
       suggestedName: 'dulce-y-masa.json',
