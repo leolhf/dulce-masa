@@ -49,7 +49,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 14px 14px calc(var(--tab-h) + var(--safe-bottom) + 14px); }
 
 /* TABS */
-.tabs { position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--tab-h) + var(--safe-bottom)); background: var(--card); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(5, 1fr); align-items: flex-start; padding-top: 8px; padding-bottom: var(--safe-bottom); z-index: 100; }
+.tabs { position: fixed; bottom: 0; left: 0; right: 0; height: calc(var(--tab-h) + var(--safe-bottom)); background: var(--card); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(6, 1fr); align-items: flex-start; padding-top: 8px; padding-bottom: var(--safe-bottom); z-index: 100; }
 .tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 2px; cursor: pointer; color: var(--text3); transition: color .2s; position: relative; }
 .tab.active { color: var(--caramel2); }
 .tab-indicator { position: absolute; top: -1px; width: 28px; height: 2px; background: var(--caramel2); border-radius: 0 0 3px 3px; opacity: 0; transition: opacity .2s; }
@@ -227,6 +227,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <button class="btn btn-secondary" onclick="irA('pedidos')" style="flex-direction:column;padding:16px;gap:5px"><span style="font-size:1.4rem">&#x1F4CB;</span><span>Ver pedidos</span></button>
       <button class="btn btn-secondary" onclick="irA('compras')" style="flex-direction:column;padding:16px;gap:5px"><span style="font-size:1.4rem">&#x1F6D2;</span><span>Registrar compra</span></button>
       <button class="btn btn-secondary" onclick="irA('stock')" style="flex-direction:column;padding:16px;gap:5px"><span style="font-size:1.4rem">&#x1F4E6;</span><span>Ver stock</span></button>
+      <button class="btn btn-secondary" onclick="irA('produccion')" style="flex-direction:column;padding:16px;gap:5px;grid-column:span 2"><span style="font-size:1.4rem">&#x1F373;</span><span>Registrar producci&#xf3;n</span></button>
     </div>
     <div class="stitle">&#x26A0; Alertas</div>
     <div id="alertas-inicio"></div>
@@ -356,6 +357,35 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
+  <!-- PRODUCCION -->
+  <div class="screen" id="screen-produccion">
+    <div class="stitle">&#x1F373; Registrar producci&#xf3;n</div>
+    <div id="prod-sugerencias-m" style="display:none;margin-bottom:12px"></div>
+    <div class="card"><div class="card-bd">
+      <div class="field"><label>Receta / Producto</label>
+        <div class="ac-wrap" id="ac-prod-rec-wrap">
+          <input type="text" id="pr-rec-txt" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 13px;color:var(--text);font-size:.95rem;font-family:'DM Sans',sans-serif;outline:none" autocomplete="off" placeholder="Buscar receta&#x2026;" oninput="acProdRecInput()" onfocus="acProdRecInput()">
+          <div class="ac-list" id="ac-prod-rec-list"></div>
+        </div>
+        <input type="hidden" id="pr-rec-id">
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Tandas</label><input type="number" id="pr-tandas" value="1" min="1" inputmode="numeric" oninput="calcProduccionM()"></div>
+        <div class="field"><label>Unidades reales (opt.)</label><input type="number" id="pr-reales" min="0" inputmode="numeric" placeholder="Auto" oninput="calcProduccionM()"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Fecha</label><input type="date" id="pr-fecha"></div>
+        <div class="field"><label>Nota</label><input type="text" id="pr-nota" placeholder="Observaci&#xf3;n&#x2026;"></div>
+      </div>
+      <div id="pr-preview" style="display:none;margin-bottom:12px;background:var(--card2);border-radius:10px;padding:11px;font-size:.82rem"></div>
+      <button class="btn btn-primary" id="pr-btn-reg" onclick="registrarProduccionM()">&#x2713; Registrar producci&#xf3;n</button>
+    </div></div>
+    <div class="divider"><span>Producciones recientes</span></div>
+    <div id="producciones-list-m">
+      <div class="empty-state"><div class="empty-icon">&#x1F373;</div><div class="empty-title">Sin producciones</div><div class="empty-sub">Sincroniz&#xe1; para ver historial</div></div>
+    </div>
+  </div>
+
 </div><!-- end .content -->
 
 <div class="tabs">
@@ -383,6 +413,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="tab-indicator"></div>
     <div class="tab-icon">&#x1F9C1;</div>
     <div class="tab-label">Productos</div>
+  </div>
+  <div class="tab" id="tab-produccion" onclick="irA('produccion')">
+    <div class="tab-indicator"></div>
+    <div class="tab-icon">&#x1F373;</div>
+    <div class="tab-label">Produc.</div>
   </div>
 </div>
 
@@ -762,6 +797,7 @@ function renderSeccion(sec){
   if(sec==='compras')   renderComprasM();
   if(sec==='stock')     filtrarStockM();
   if(sec==='productos') renderProductosM();
+  if(sec==='produccion') renderProduccionM();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1250,6 +1286,7 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#ac-ing-wrap'))  document.getElementById('ac-ing-list').classList.remove('open');
   if(!e.target.closest('#ac-prov-wrap')) document.getElementById('ac-prov-list').classList.remove('open');
   const rl=document.getElementById('ac-receta-list'); if(rl&&!e.target.closest('.ac-wrap')) rl.classList.remove('open');
+  const rp=document.getElementById('ac-prod-rec-list'); if(rp&&!e.target.closest('#ac-prod-rec-wrap')) rp.classList.remove('open');
 });
 
 function calcCompraM(){
@@ -1463,6 +1500,20 @@ async function deshacerMovil(){
         _data.lotesIngredientes=(_data.lotesIngredientes||[]).filter(l=>l.compraId!==accion.datos.id);
         break;
       }
+      case 'produccion_nueva': {
+        // Devolver ingredientes al stock
+        const rDes=(_data.recetas||[]).find(r=>r.id==accion.datos.recetaId);
+        if(rDes&&Array.isArray(rDes.ings)){
+          rDes.ings.forEach(ri=>{
+            const ingObj=_ing(ri.ingId);
+            if(ingObj) ingObj.stock=+(ingObj.stock+ri.qty*accion.datos.tandas).toFixed(4);
+          });
+        }
+        _data.producciones=(_data.producciones||[]).filter(p=>p.id!==accion.datos.id);
+        // Recalcular stock de producto
+        (_data.stockProductos||[]).forEach(sp=>{if(sp.recetaId==accion.datos.recetaId) sp.stock=_calcStockProducto(sp.recetaId);});
+        break;
+      }
     }
     // Recalcular todos los stocks de productos afectados
     (_data.recetas||[]).forEach(r=>{
@@ -1479,6 +1530,245 @@ async function deshacerMovil(){
     toast('⚠ Error al deshacer');
     _historial.unshift(accion); _actualizarBtnDeshacer();
   }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRODUCCIÓN
+// ═══════════════════════════════════════════════════════
+function renderProduccionM(){
+  // Inicializar fecha si está vacía
+  const fechaEl=document.getElementById('pr-fecha');
+  if(fechaEl&&!fechaEl.value) fechaEl.value=today();
+  calcProduccionM();
+  _renderProduccionSugerenciasM();
+  _renderProduccionesListM();
+}
+
+function acProdRecInput(){
+  const txt=(document.getElementById('pr-rec-txt')?.value||'').toLowerCase();
+  const list=document.getElementById('ac-prod-rec-list');
+  const recs=(_data?.recetas||[]).filter(r=>!txt||r.nombre.toLowerCase().includes(txt)).slice(0,10);
+  list.innerHTML=recs.map(r=>{
+    const sp=_sprod(r.id);
+    const stock=_calcStockProducto(r.id);
+    return `<div class="ac-item" onclick="selProdRec(${r.id},'${r.nombre.replace(/'/g,"\\'")}')">
+      ${escapeHTML(r.nombre)}<span class="ac-sub">rinde ${r.rinde||'?'} u. · stock ${stock}</span>
+    </div>`;
+  }).join('')||'<div class="ac-item" style="color:var(--text3)">Sin recetas</div>';
+  list.classList.add('open');
+}
+
+function selProdRec(id,nombre){
+  document.getElementById('pr-rec-id').value=id;
+  document.getElementById('pr-rec-txt').value=nombre;
+  document.getElementById('ac-prod-rec-list').classList.remove('open');
+  calcProduccionM();
+  document.getElementById('pr-tandas').focus();
+}
+
+function calcProduccionM(){
+  const rId=parseInt(document.getElementById('pr-rec-id').value)||0;
+  const tandas=parseInt(document.getElementById('pr-tandas').value)||1;
+  const reales=parseInt(document.getElementById('pr-reales').value)||0;
+  const prev=document.getElementById('pr-preview');
+  if(!rId||!_data){ prev.style.display='none'; return; }
+  const r=(_data.recetas||[]).find(x=>x.id==rId);
+  if(!r){ prev.style.display='none'; return; }
+
+  const planificado=r.rinde*tandas;
+  const unidadesAProducir=reales>0?reales:planificado;
+  const merma=reales>0?planificado-reales:0;
+
+  // Verificar ingredientes
+  const ings=(r.ings||[]);
+  let todosOk=true;
+  const rowsHTML=ings.map(ri=>{
+    const iObj=_ing(ri.ingId);
+    if(!iObj) return '';
+    const needed=ri.qty*tandas;
+    const ok=iObj.stock>=needed;
+    if(!ok) todosOk=false;
+    const stockTxt=iObj.stock<1&&(iObj.unidad==='kg'||iObj.unidad==='l')
+      ?Math.round(iObj.stock*1000)+(iObj.unidad==='kg'?'g':'ml')
+      :(Math.round(iObj.stock*1000)/1000)+' '+iObj.unidad;
+    return `<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:.9rem">${ok?'&#x2705;':'&#x274C;'}</span>
+      <span style="flex:1;font-size:.8rem">${escapeHTML(iObj.nombre)}</span>
+      <span style="font-size:.78rem;color:var(--${ok?'ok':'danger'})">${fmtN(needed,3)} ${iObj.unidad} (hay ${stockTxt})</span>
+    </div>`;
+  }).join('');
+
+  // Pedidos relacionados
+  const pedidosRel=(_data.pedidos||[]).filter(p=>p.estado!=='entregado'&&(p.items||[]).some(it=>it.recetaId==rId));
+  let pedidosHTML='';
+  if(pedidosRel.length>0){
+    const totalPedido=pedidosRel.reduce((a,p)=>a+(p.items||[]).filter(it=>it.recetaId==rId).reduce((s,it)=>s+it.cantidad,0),0);
+    const stockActual=_calcStockProducto(rId);
+    const stockTras=stockActual+unidadesAProducir;
+    const cubre=stockTras>=totalPedido;
+    pedidosHTML=`<div style="margin-top:8px;background:var(--warn-bg);border:1px solid rgba(232,168,74,.3);border-radius:8px;padding:8px 10px;font-size:.78rem">
+      <span style="color:var(--warn);font-weight:600">&#x1F4CB; ${pedidosRel.length} pedido${pedidosRel.length>1?'s':''} requieren esta receta (${totalPedido} u.)</span><br>
+      <span style="color:var(--${cubre?'ok':'danger'})">${cubre?'&#x2713; Stock suficiente tras producir':'&#x26A0; A&#xfa;n faltar&#xe1;n '+(totalPedido-stockTras)+' u.'}</span>
+    </div>`;
+  }
+
+  const mermaHTML=reales>0&&merma>0?`<div style="color:var(--danger);font-size:.78rem;margin-top:5px">&#x26A0; Merma: ${merma} unid. (${Math.round(merma/planificado*100)}%)</div>`:'';
+
+  prev.style.display='block';
+  prev.innerHTML=`
+    <div style="font-weight:600;font-size:.83rem;color:var(--${todosOk?'ok':'danger'});margin-bottom:7px">
+      ${todosOk?'&#x2705; Stock suficiente':'&#x274C; Falta stock para producir'} &mdash; ${unidadesAProducir} unidades planificadas
+    </div>
+    ${ings.length?rowsHTML:'<div style="color:var(--text3);font-size:.78rem">Esta receta no tiene ingredientes registrados</div>'}
+    ${mermaHTML}${pedidosHTML}`;
+}
+
+async function registrarProduccionM(){
+  if(!_data){ toast('&#x26A0; Sincroniz&#xe1; primero'); return; }
+  const rId=parseInt(document.getElementById('pr-rec-id').value)||0;
+  const tandas=parseInt(document.getElementById('pr-tandas').value)||0;
+  const realesInput=parseInt(document.getElementById('pr-reales').value)||0;
+  const fecha=document.getElementById('pr-fecha').value||today();
+  const nota=document.getElementById('pr-nota').value.trim();
+  if(!rId){ toast('&#x26A0; Seleccion&#xe1; una receta'); return; }
+  if(tandas<=0){ toast('&#x26A0; La cantidad de tandas debe ser mayor a 0'); return; }
+  const r=(_data.recetas||[]).find(x=>x.id==rId);
+  if(!r){ toast('&#x26A0; Receta no encontrada'); return; }
+
+  // Verificar stock de ingredientes
+  const sinStock=[];
+  (r.ings||[]).forEach(ri=>{
+    const iObj=_ing(ri.ingId);
+    if(!iObj){ sinStock.push('Ingrediente desconocido'); return; }
+    if(iObj.stock<ri.qty*tandas) sinStock.push(`${iObj.nombre}: necesita ${fmtN(ri.qty*tandas,3)} ${iObj.unidad}, hay ${fmtN(iObj.stock,3)}`);
+  });
+  if(sinStock.length){ toast('&#x26A0; Stock insuficiente: '+sinStock[0],5000); return; }
+
+  const unidadesReales=realesInput>0?realesInput:(r.rinde||1)*tandas;
+
+  // Descontar ingredientes
+  (r.ings||[]).forEach(ri=>{
+    const iObj=_ing(ri.ingId);
+    if(iObj) iObj.stock=Math.max(0,+(iObj.stock-ri.qty*tandas).toFixed(4));
+  });
+
+  const nuevaProd={
+    id:_nextId('producciones'),
+    fecha,
+    recetaId:rId,
+    tandas,
+    unidadesReales,
+    nota
+  };
+  if(!_data.producciones) _data.producciones=[];
+  _data.producciones.push(nuevaProd);
+
+  // Recalcular stock del producto terminado
+  let sp=_sprod(rId);
+  if(!sp){ sp={recetaId:rId,stock:0,total:0}; (_data.stockProductos||(_data.stockProductos=[])).push(sp); }
+  sp.stock=_calcStockProducto(rId);
+
+  // Guardar para deshacer
+  _pushHistorial('produccion_nueva',{id:nuevaProd.id,recetaId:rId,tandas,unidadesReales});
+
+  _data._guardado=nowISOLocal();
+  await _guardarLocal();
+  _actualizarSyncUI();
+
+  // Limpiar form
+  document.getElementById('pr-rec-id').value='';
+  document.getElementById('pr-rec-txt').value='';
+  document.getElementById('pr-tandas').value=1;
+  document.getElementById('pr-reales').value='';
+  document.getElementById('pr-nota').value='';
+  document.getElementById('pr-preview').style.display='none';
+
+  renderProduccionM();
+  toast(`&#x2713; ${unidadesReales} unidades de "${r.nombre}" producidas`);
+}
+
+function _renderProduccionesListM(){
+  const cont=document.getElementById('producciones-list-m');
+  if(!_data){ cont.innerHTML=`<div class="empty-state"><div class="empty-icon">&#x1F373;</div><div class="empty-title">Sincroniz&#xe1; para ver producciones</div></div>`; return; }
+  const lista=[...(_data.producciones||[])].sort((a,b)=>(b.id||0)-(a.id||0)).slice(0,15);
+  if(!lista.length){ cont.innerHTML=`<div class="empty-state"><div class="empty-icon">&#x1F373;</div><div class="empty-title">Sin producciones registradas</div><div class="empty-sub">Registr&#xe1; tu primera producci&#xf3;n arriba</div></div>`; return; }
+  cont.innerHTML=lista.map(p=>{
+    const r=(_data.recetas||[]).find(x=>x.id==p.recetaId);
+    const r2=(_data.recetas||[]).find(x=>x.id==p.recetaId);
+    const planificado=r2?r2.rinde*p.tandas:0;
+    const real=p.unidadesReales||planificado;
+    const merma=planificado>0?planificado-real:0;
+    return `<div class="li">
+      <div class="li-icon" style="background:rgba(196,124,43,.12)">&#x1F373;</div>
+      <div class="li-body">
+        <div class="li-title">${r?escapeHTML(r.nombre):'?'}</div>
+        <div class="li-sub">${p.fecha} &#xb7; ${p.tandas} tanda${p.tandas>1?'s':''} &#xb7; ${real} unidades${merma>0?` <span style="color:var(--danger)">(merma ${merma})</span>`:''}${p.nota?' &#xb7; '+escapeHTML(p.nota):''}</div>
+      </div>
+      <div class="li-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+        <span class="badge badge-ok">${real} u.</span>
+        <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:.65rem" onclick="_elimProduccionM(${p.id})">&#x2715;</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function _elimProduccionM(id){
+  if(!_data) return;
+  const p=(_data.producciones||[]).find(x=>x.id==id); if(!p) return;
+  const r=(_data.recetas||[]).find(x=>x.id==p.recetaId);
+  if(!confirm(`&#xbf;Eliminar esta producci&#xf3;n de "${r?r.nombre:'?'}"? Los ingredientes ser&#xe1;n devueltos al stock.`)) return;
+  // Devolver ingredientes al stock
+  if(r&&Array.isArray(r.ings)){
+    r.ings.forEach(ri=>{
+      const iObj=_ing(ri.ingId);
+      if(iObj) iObj.stock=+(iObj.stock+ri.qty*p.tandas).toFixed(4);
+    });
+  }
+  _data.producciones=(_data.producciones||[]).filter(x=>x.id!==id);
+  // Recalcular stock producto
+  let sp=_sprod(p.recetaId);
+  if(sp) sp.stock=_calcStockProducto(p.recetaId);
+  _data._guardado=nowISOLocal();
+  await _guardarLocal();
+  _actualizarSyncUI();
+  _renderProduccionesListM();
+  toast('&#x2713; Producci&#xf3;n eliminada — ingredientes devueltos al stock');
+}
+
+function _renderProduccionSugerenciasM(){
+  const el=document.getElementById('prod-sugerencias-m'); if(!el||!_data) return;
+  const demanda={};
+  (_data.pedidos||[]).filter(p=>p.estado!=='entregado').forEach(p=>{
+    (p.items||[]).forEach(it=>{
+      if(!it.recetaId) return;
+      if(!demanda[it.recetaId]) demanda[it.recetaId]={total:0};
+      demanda[it.recetaId].total+=it.cantidad||1;
+    });
+  });
+  const items=Object.entries(demanda).filter(([,v])=>v.total>0);
+  if(!items.length){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML=`<div class="card" style="border-color:rgba(232,168,74,.4)">
+    <div class="card-hd"><span style="color:var(--warn)">&#x1F4CB; Producci&#xf3;n sugerida por pedidos</span></div>
+    <div class="card-bd" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+      ${items.map(([recetaId,v])=>{
+        const r=(_data.recetas||[]).find(x=>x.id==parseInt(recetaId));
+        if(!r) return '';
+        const stockActual=_calcStockProducto(r.id);
+        const faltante=Math.max(0,v.total-stockActual);
+        const tandas=r.rinde>0?Math.ceil(faltante/r.rinde):1;
+        return `<div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:.83rem">
+            <span style="font-weight:600">${escapeHTML(r.nombre)}</span>
+            <span style="color:var(--text3)"> &#xb7; ${v.total} pedidas &#xb7; ${stockActual} en stock</span>
+          </div>
+          ${faltante>0?`<button class="btn btn-warn btn-sm" style="white-space:nowrap" onclick="selProdRec(${r.id},'${r.nombre.replace(/'/g,"\\'")}');document.getElementById('pr-tandas').value=${tandas};calcProduccionM()">
+            +${tandas} tanda${tandas>1?'s':''}
+          </button>`:`<span class="badge badge-ok">&#x2713; OK</span>`}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════
