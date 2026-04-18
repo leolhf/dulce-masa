@@ -36,11 +36,11 @@ function _finMetricas(periodo){
   const comprasPer  = enRango(historialCompras);
   const extPer      = enRango(extracciones);
 
-  const ingresosBrutos = ventasPer.reduce((a,v) => a + v.unidades * v.precio, 0);
-  const totalPropinas  = ventasPer.reduce((a,v) => a + (v.propina || 0), 0);
+  const ingresosBrutos = ventasPer.filter(v => v.cobrado !== false).reduce((a,v) => a + v.unidades * v.precio, 0);
+  const totalPropinas  = ventasPer.filter(v => v.cobrado !== false).reduce((a,v) => a + (v.propina || 0), 0);
   const ingresosTotal  = ingresosBrutos + totalPropinas;
 
-  const costosVariables = ventasPer.reduce((a,v) => {
+  const costosVariables = ventasPer.filter(v => v.cobrado !== false).reduce((a,v) => {
     const r = rec(v.recetaId);
     return a + (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
   }, 0);
@@ -155,6 +155,7 @@ function _finSerieMensual(meses = 6){
   };
 
   (ventas || []).forEach(v => {
+    if(v.cobrado === false) return;
     const m = buscarMes(v.fecha);
     if(!m) return;
     m.ingresos += v.unidades * v.precio + (v.propina || 0);

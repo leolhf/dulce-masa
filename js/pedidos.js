@@ -314,25 +314,6 @@ function actualizarEstadoPedido(id,nuevoEstado){
   // Stock: el pedido sale de totalPedidosListo pero NO entra en ventas todavía.
   // La venta se registra solo cuando se cobra (estado 'entregado').
   if(nuevoEstado==='entregado_sin_cobrar'){
-    p.estado='entregado_sin_cobrar';
-    p.fechaEntregaReal = today();
-    // Recalcular stock: el pedido sale de pedidosListo
-    // Como entregado_sin_cobrar no está en ventas aún, recalcStockProducto lo excluye
-    // pero tampoco lo cuenta como pedidoListo → el stock sube temporalmente
-    // Esto es correcto: el producto ya salió físicamente
-    const recetasUnicasEsc=[...new Set(p.items.map(it=>it.recetaId))];
-    recetasUnicasEsc.forEach(rid=>recalcStockProducto(rid));
-    refreshAllStockViews();
-    renderPedidos();
-    saveData();
-    toast('📦 Pedido entregado — cobro pendiente');
-    return;
-  }
-
-  // ── ENTREGADO SIN COBRAR → COBRADO ──
-  // También aplica LISTO → COBRADO directo (si el cliente paga al recibir).
-  // Registra la venta en finanzas.
-  if(nuevoEstado==='entregado'){
     if(!ventas) ventas=[];
     p.ventaIds=[];
     p.items.forEach(item=>{
@@ -346,20 +327,60 @@ function actualizarEstadoPedido(id,nuevoEstado){
         precio:item.precio,
         propina:0,
         canal:'encargo',
-        nota:`Pedido #${p.id}: ${escapeHTML(p.cliente)}`
+        cobrado:false,
+        nota:`Pedido #${p.id}: ${escapeHTML(p.cliente)}` 
       });
     });
-    p.estado='entregado';
-    p.fechaCobro = today();
-    // Si venía de entregado_sin_cobrar: el stock ya fue recalculado,
-    // solo necesitamos que las ventas entren en totalVendido
-    const recetasUnicas=[...new Set(p.items.map(it=>it.recetaId))];
-    recetasUnicas.forEach(rid=>recalcStockProducto(rid));
+    p.estado='entregado_sin_cobrar';
+    p.fechaEntregaReal=today();
+    const recetasUnicasEsc=[...new Set(p.items.map(it=>it.recetaId))];
+    recetasUnicasEsc.forEach(rid=>recalcStockProducto(rid));
     refreshAllStockViews();
     renderPedidos();
+    renderVentas();
+    saveData();
+    toast('📦 Pedido entregado — cobro pendiente');
+    return;
+  }
+
+  // ── ENTREGADO SIN COBRAR → COBRADO ──
+  // También aplica LISTO → COBRADO directo (si el cliente paga al recibir).
+  // Registra la venta en finanzas.
+  if(nuevoEstado==='entregado'){
+    if(!ventas) ventas=[];
+    // Si viene de entregado_sin_cobrar: las ventas ya existen, solo marcarlas como cobradas
+    if(p.estado==='entregado_sin_cobrar' && p.ventaIds && p.ventaIds.length>0){
+      const idsSet=new Set(p.ventaIds);
+      ventas.filter(v=>idsSet.has(v.id)).forEach(v=>{ v.cobrado=true; });
+    } else {
+      // Viene directo de 'listo' (cobro al momento de entregar): crear las ventas
+      p.ventaIds=[];
+      p.items.forEach(item=>{
+        const vid=nextId.venta++;
+        p.ventaIds.push(vid);
+        ventas.push({
+          id:vid,
+          fecha:today(),
+          recetaId:item.recetaId,
+          unidades:item.cantidad,
+          precio:item.precio,
+          propina:0,
+          canal:'encargo',
+          cobrado:true,
+          nota:`Pedido #${p.id}: ${escapeHTML(p.cliente)}` 
+        });
+      });
+      const recetasUnicas=[...new Set(p.items.map(it=>it.recetaId))];
+      recetasUnicas.forEach(rid=>recalcStockProducto(rid));
+    }
+    p.estado='entregado';
+    p.fechaCobro=today();
+    refreshAllStockViews();
+    renderPedidos();
+    renderVentas();
     renderFinanzas();
     saveData();
-    toast('💰 Cobro registrado — venta guardada en finanzas');
+    toast('💰 Cobro registrado — venta reflejada en finanzas');
     return;
   }
 
@@ -437,7 +458,7 @@ function _doEliminarPedido(id){
     p.items.forEach(item=>recalcStockProducto(item.recetaId));
   }
   // 'entregado': eliminar las ventas automáticas (guardadas con ventaIds si existen, o por nota+receta+cantidad)
-  if(p.estado==='entregado'){
+  if(p.estado==='entregado' || p.estado==='entregado_sin_cobrar'){
     if(p.ventaIds && p.ventaIds.length>0){
       const idsSet = new Set(p.ventaIds);
       ventas = (ventas||[]).filter(v => !idsSet.has(v.id));
@@ -452,7 +473,7 @@ function _doEliminarPedido(id){
       });
     }
   }
-  refreshAllStockViews();renderPedidos();renderFinanzas();saveData();toast('Pedido eliminado');
+  refreshAllStockViews();renderPedidos();renderVentas();renderFinanzas();saveData();toast('Pedido eliminado');
 }
 function eliminarPedido(id){
   const p=pedidos.find(pe=>pe.id==id);

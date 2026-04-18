@@ -58,8 +58,8 @@ function renderEstadisticas(){
   const antAnt  = (pedidos||[]).filter(p=>p.estado!=='entregado'&&p.fecha&&createDate(p.fecha)>=periodoAnterior.inicio&&createDate(p.fecha)<=periodoAnterior.fin).reduce((a,p)=>a+p.anticipo,0);
 
   // ─── KPIs financieros ───
-  const ingresos        = ventasPer.reduce((a,v)=>a+v.unidades*v.precio,0) + antPend;
-  const ingresosAnt     = ventasAnt.reduce((a,v)=>a+v.unidades*v.precio,0) + antAnt;
+  const ingresos        = ventasPer.filter(v=>v.cobrado!==false).reduce((a,v)=>a+v.unidades*v.precio,0) + antPend;
+  const ingresosAnt     = ventasAnt.filter(v=>v.cobrado!==false).reduce((a,v)=>a+v.unidades*v.precio,0) + antAnt;
   const costos          = prodPer.reduce((a,p)=>{const r=rec(p.recetaId);return a+(r?calcCosto(r,p.tandas):0);},0);
   const costosAnt       = prodAnt.reduce((a,p)=>{const r=rec(p.recetaId);return a+(r?calcCosto(r,p.tandas):0);},0);
   const ganancia        = ingresos - costos;

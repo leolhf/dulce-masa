@@ -78,7 +78,7 @@ function stockFisicoProducto(recetaId){
 
 function stockReservadoProducto(recetaId){
   return (pedidos||[])
-    .filter(p => p.estado === 'listo' || p.estado === 'entregado_sin_cobrar')
+    .filter(p => p.estado === 'listo')
     .reduce((a, p) => a + (p.items||[])
       .filter(it => it.recetaId === recetaId)
       .reduce((b, it) => b + (it.cantidad || 0), 0), 0);
@@ -129,7 +129,7 @@ function recalcStockProducto(recetaId){
   // - 'entregado_sin_cobrar': producto ya salió físicamente pero aún no hay venta registrada
   // - 'entregado': ya está en ventas, no se cuenta aquí para evitar doble descuento
   const totalPedidosListo = (pedidos||[])
-    .filter(p => p.estado === 'listo' || p.estado === 'entregado_sin_cobrar')
+    .filter(p => p.estado === 'listo')
     .reduce((a, p) => {
       return a + p.items.filter(it => it.recetaId === recetaId).reduce((b, it) => b + it.cantidad, 0);
     }, 0);

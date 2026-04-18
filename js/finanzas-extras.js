@@ -59,7 +59,7 @@ function _renderSemanaFinanciera() {
   const diaNombres = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
   const dataDias = dias.map(({ key, d }) => {
-    const ing = (ventas || []).filter(v => v.fecha === key)
+    const ing = (ventas || []).filter(v => v.fecha === key && v.cobrado !== false)
       .reduce((a, v) => a + v.unidades * v.precio + (v.propina || 0), 0);
     const gas = (historialCompras || []).filter(c => c.fecha === key)
       .reduce((a, c) => a + c.qty * c.precio, 0);

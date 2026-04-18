@@ -1,7 +1,7 @@
 // ══════════════ SERVICE WORKER - PWA ══════════════
-const CACHE_NAME = 'dulce-masa-v15';
-const STATIC_CACHE = 'dulce-masa-static-v15';
-const DYNAMIC_CACHE = 'dulce-masa-dynamic-v15';
+const CACHE_NAME = 'dulce-masa-v17';
+const STATIC_CACHE = 'dulce-masa-static-v17';
+const DYNAMIC_CACHE = 'dulce-masa-dynamic-v17';
 
 // Archivos estáticos — rutas RELATIVAS para funcionar en cualquier subpath
 const STATIC_ASSETS = [
@@ -25,6 +25,8 @@ const STATIC_ASSETS = [
   './js/paginator.js',
   // CAPA 1: Datos y persistencia
   './js/data-init.js',
+  './js/deshacer.js',
+  './js/lotes-fifo.js',
   './js/exportar.js',
   // CAPA 2: UI base y navegación
   './js/navigation.js',

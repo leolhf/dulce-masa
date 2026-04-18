@@ -99,8 +99,8 @@ function _cargarDatosJSON(text){
   (historialCompras||[]).forEach(c=>{const n=Number(c.id);if(c.id===undefined||c.id===null||isNaN(n)||n<=0){c.id=++_maxC;}else{c.id=n;}});
   nextId.comp=Math.max(nextId.comp,_maxC+1);
 
-  saveData();
   initApp();
+  saveData();
 }
 
 // Wrapper específico para exportar compras desde el botón de Compras

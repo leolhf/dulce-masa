@@ -123,8 +123,8 @@ async function initializeData(){
   });
   nextId.comp=Math.max(nextId.comp,_maxCompId+1);
 
-  initApp();
-  if(_idsSaneados>0){
+  const _reparacionesInicio = initApp();
+  if(_idsSaneados>0 || _reparacionesInicio>0){
     console.warn(`[DulceMasa] Se sanearon ${_idsSaneados} id(s) en historialCompras`);
     saveData();
   }
@@ -134,12 +134,17 @@ async function initializeData(){
 
 function initApp(){
   inicializarLotesDesdeStock();
+  const reparaciones = typeof repararLotesConStockGuardado === 'function' ? repararLotesConStockGuardado() : 0;
   sincronizarStockConLotes();
+  inicializarStockProductos();
+  if(typeof recalcStockProducto === 'function' && Array.isArray(recetas)){
+    recetas.forEach(r => recalcStockProducto(r.id));
+  }
   updateAlertBadge();
   renderDashboard();
-  inicializarStockProductos();
   // Inicializar fecha del formulario de retiros
   const ef = $('ext-fecha'); if(ef) ef.value = today();
+  return reparaciones;
 }
 
 function borrarTodosLosDatos(){
@@ -221,61 +226,23 @@ function stockLabel(i){
   if(i.min>0&&i.stock<i.min*1.5)return'Por reponer';
   return'OK';
 }
-function calcCosto(r,tandas=1){
-  // Calcular costo basado en precio promedio de ingredientes
-  return r.ings.reduce((a,ri)=>{
-    const i=ing(ri.ingId);
+function calcCosto(r, tandas=1){
+  // Intentar calcular por FIFO real usando lotes disponibles
+  if(typeof estimarCostoFIFO === 'function' && lotesIngredientes && lotesIngredientes.length > 0){
+    try {
+      return estimarCostoFIFO(r, tandas).costoTotal;
+    } catch(e) {
+      // Sin stock suficiente en lotes - caer al precio fijo como respaldo
+    }
+  }
+  // Respaldo: precio fijo del inventario
+  return r.ings.reduce((a, ri) => {
+    const i = ing(ri.ingId);
     if(!i) return a;
-    
-    // Obtener precio promedio del ingrediente desde historial de compras
-    const precioPromedio = obtenerPrecioPromedioIngrediente(i.id);
-    const precioUsar = precioPromedio > 0 ? precioPromedio : i.precio;
-    
-    return a + ri.qty * tandas * precioUsar;
-  },0);
+    return a + ri.qty * tandas * (i.precio || 0);
+  }, 0);
 }
 
-function obtenerPrecioPromedioIngrediente(ingId) {
-  const tipoPrecio = $('inv-precio-tipo')?.value || 'fijo';
-  const ingrediente = ingredientes.find(i => i.id == ingId);
-  
-  switch(tipoPrecio) {
-    case 'fijo':
-      // Usar precio fijo del inventario
-      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
-      
-    case 'promedio':
-      // Usar precio promedio del historial de compras
-      if (!historialCompras || historialCompras.length === 0) return 0;
-      const comprasPromedio = historialCompras.filter(c => c.ingId == ingId);
-      if (comprasPromedio.length === 0) return 0;
-      const totalCantidad = comprasPromedio.reduce((a, c) => a + c.qty, 0);
-      const totalMonto = comprasPromedio.reduce((a, c) => {
-        if (c.total !== undefined && c.total !== null) {
-          return a + c.total;
-        }
-        return a + (c.qty * c.precio);
-      }, 0);
-      return totalCantidad > 0 ? totalMonto / totalCantidad : 0;
-      
-    case 'ultimo':
-      // Usar precio de la última compra
-      if (!historialCompras || historialCompras.length === 0) return 0;
-      const comprasUltimo = historialCompras.filter(c => c.ingId == ingId);
-      if (comprasUltimo.length === 0) return 0;
-      const ultimaCompra = comprasUltimo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
-      return ultimaCompra ? ultimaCompra.precio : 0;
-    case 'fifo':
-      // Usar costo promedio ponderado de lotes disponibles
-      if (typeof obtenerCostoPromedio === 'function') {
-        return obtenerCostoPromedio(ingId);
-      }
-      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
-      
-    default:
-      return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
-  }
-}
 function canProduce(r,tandas=1){
   return r.ings.every(ri=>{const i=ing(ri.ingId);return i&&i.stock>=ri.qty*tandas;});
 }

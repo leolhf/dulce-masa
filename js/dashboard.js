@@ -21,14 +21,14 @@ function renderDashboard(){
   const mesActual = mesActualNum; // 1-based
 
   const ventasHoy = (ventas||[]).filter(v => v.fecha === hoyStr);
-  const ingresosHoy = ventasHoy.reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
+  const ingresosHoy = ventasHoy.filter(v => v.cobrado !== false).reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
 
   const ventasMes = (ventas||[]).filter(v => {
     if(!v.fecha) return false;
     const [y, m] = v.fecha.split('-').map(Number);
     return y === anioActual && m === mesActual;
   });
-  const ingresosMes = ventasMes.reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
+  const ingresosMes = ventasMes.filter(v => v.cobrado !== false).reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
   
   // Ingresos mes anterior (para comparación de tendencia)
   const mesAnteriorNum = mesActual === 1 ? 12 : mesActual - 1;
@@ -38,7 +38,7 @@ function renderDashboard(){
     const [y, m] = v.fecha.split('-').map(Number);
     return y === anioMesAnterior && m === mesAnteriorNum;
   });
-  const ingresosMesAnterior = ventasMesAnterior.reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
+  const ingresosMesAnterior = ventasMesAnterior.filter(v => v.cobrado !== false).reduce((a,v) => a + (v.unidades * v.precio) + (v.propina||0), 0);
 
   // Eficiencia operativa (últimos 30 días para ser más relevante)
   const hace30 = createDate(rangoUltimosDias(30)[0]);
@@ -46,7 +46,7 @@ function renderDashboard(){
     const r = rec(p.recetaId);
     return a + (r ? r.rinde * p.tandas : 0);
   }, 0);
-  const totalVentasUnidades = ventas.reduce((a,v) => a + v.unidades, 0);
+  const totalVentasUnidades = ventas.filter(v => v.cobrado !== false).reduce((a,v) => a + v.unidades, 0);
   const eficiencia = totalProduccion > 0 ? Math.round((totalVentasUnidades / totalProduccion) * 100) : 0;
 
   // ── KPIs Ejecutivos ──

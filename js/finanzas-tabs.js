@@ -70,8 +70,8 @@ function renderAnalisisTab() {
   const ventasP  = inRng(ventas);
   const extP     = inRng(extracciones);
 
-  const totalIngresos = ventasP.reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
-  const costoIngredientes = ventasP.reduce((a,v) => {
+  const totalIngresos = ventasP.filter(v => v.cobrado !== false).reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
+  const costoIngredientes = ventasP.filter(v => v.cobrado !== false).reduce((a,v) => {
     const r = rec(v.recetaId);
     return a + (r ? calcCosto(r, v.unidades / (r.rinde || 1)) : 0);
   }, 0);
@@ -91,7 +91,7 @@ function renderAnalisisTab() {
     const d = createDate(v.fecha);
     return d.getFullYear()===hoy.getFullYear() && d.getMonth()===hoy.getMonth();
   });
-  const ingMes  = ventasMes.reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
+  const ingMes  = ventasMes.filter(v => v.cobrado !== false).reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
   const ritmo   = diaActual > 0 ? ingMes / diaActual : 0;
   const proyMes = ingMes + ritmo * diasRest;
 
@@ -293,7 +293,7 @@ function diagnosticarFinanzasCompras() {
   });
   const totalCompras = comprasEnRango.reduce((a,c) => a + c.qty*c.precio, 0);
   const totalVentas  = (ventas||[]).filter(v => {
-    const d = createDate(v.fecha); return d >= desde && d <= hasta;
+    const d = createDate(v.fecha); return d >= desde && d <= hasta && v.cobrado !== false;
   }).length;
 
   const desdeStr = formatDateWithTimezone(desde, {format:'date'});

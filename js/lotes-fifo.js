@@ -90,6 +90,7 @@ function obtenerLotesDisponibles(ingredienteId) {
 function consumirIngredientesFIFO(receta, tandas) {
   const detalleConsumo = [];
   let costoTotal = 0;
+  const consumosAplicados = [];
   
   receta.ings.forEach(ingReceta => {
     const ingrediente = ing(ingReceta.ingId);
@@ -121,12 +122,21 @@ function consumirIngredientesFIFO(receta, tandas) {
         costoUnitario: lote.costoUnitario,
         costoTotal: costoConsumo
       });
+      consumosAplicados.push({ loteId: lote.id, cantidadConsumida });
       
       cantidadPorConsumir -= cantidadConsumida;
     }
     
     // Verificar si hubo stock suficiente
     if (cantidadPorConsumir > 0) {
+      consumosAplicados.forEach(cons => {
+        const lote = lotesIngredientes.find(l => l.id === cons.loteId);
+        if (!lote) return;
+        lote.cantidadRestante = Math.min(
+          lote.cantidad,
+          +(Number(lote.cantidadRestante || 0) + Number(cons.cantidadConsumida || 0)).toFixed(4)
+        );
+      });
       throw new Error(`Stock insuficiente para ${ingrediente.nombre}. Faltan ${cantidadPorConsumir} ${ingrediente.unidad}`);
     }
     
@@ -141,6 +151,7 @@ function consumirIngredientesFIFO(receta, tandas) {
     });
   });
   
+  sincronizarStockConLotes();
   return {
     costoTotal,
     costoRealPorUnidad: receta.rinde > 0 ? costoTotal / receta.rinde : 0,
@@ -238,6 +249,38 @@ function sincronizarStockConLotes() {
     ingrediente.stock = obtenerStockDesdeLotes(ingrediente.id);
     ingrediente.precio = obtenerCostoPromedio(ingrediente.id);
   });
+}
+
+function repararLotesConStockGuardado() {
+  if (!Array.isArray(ingredientes) || !Array.isArray(lotesIngredientes) || lotesIngredientes.length === 0) return 0;
+  let reparados = 0;
+  ingredientes.forEach(ingrediente => {
+    const stockGuardado = +Number(ingrediente.stock || 0).toFixed(4);
+    const lotesIng = lotesIngredientes
+      .filter(l => l.ingredienteId === ingrediente.id)
+      .sort((a, b) => new Date(b.fechaIngreso || '') - new Date(a.fechaIngreso || '') || (b.id || 0) - (a.id || 0));
+    const stockLotes = +lotesIng.reduce((total, lote) => total + Number(lote.cantidadRestante || 0), 0).toFixed(4);
+    const diferencia = +(stockLotes - stockGuardado).toFixed(4);
+
+    if (Math.abs(diferencia) < 0.0001) return;
+
+    if (diferencia > 0) {
+      let pendiente = diferencia;
+      lotesIng.forEach(lote => {
+        if (pendiente <= 0) return;
+        const disponible = Number(lote.cantidadRestante || 0);
+        const ajuste = Math.min(disponible, pendiente);
+        lote.cantidadRestante = +(disponible - ajuste).toFixed(4);
+        pendiente = +(pendiente - ajuste).toFixed(4);
+      });
+      reparados++;
+    } else if (stockGuardado > stockLotes) {
+      const costo = !isNaN(Number(ingrediente.precio)) ? Number(ingrediente.precio) : 0;
+      crearLote(ingrediente.id, Math.abs(diferencia), costo, today(), null, null, 'Ajuste automático al cargar: stock guardado mayor que lotes');
+      reparados++;
+    }
+  });
+  return reparados;
 }
 
 // Función para inicializar lotes desde el stock existente (migración)
@@ -462,3 +505,25 @@ function ajustarStockManualEnLotes(ingredienteId, nuevoStock, costoUnitario = nu
   }
   sincronizarStockConLotes();
 }
+
+// ── API pública ────────────────────────────────
+window.crearLote                      = crearLote;
+window.crearLoteDesdeCompra           = crearLoteDesdeCompra;
+window.buscarLotePorCompra            = buscarLotePorCompra;
+window.actualizarLoteDesdeCompra      = actualizarLoteDesdeCompra;
+window.eliminarLotePorCompra          = eliminarLotePorCompra;
+window.obtenerLotesDisponibles        = obtenerLotesDisponibles;
+window.consumirIngredientesFIFO       = consumirIngredientesFIFO;
+window.consumirIngredientesFIFOPorReceta = consumirIngredientesFIFOPorReceta;
+window.devolverIngredientesAFIFO      = devolverIngredientesAFIFO;
+window.devolverConsumoFIFO            = devolverConsumoFIFO;
+window.devolverConsumoLotes           = devolverConsumoLotes;
+window.consumirDesdeDetalleLotes      = consumirDesdeDetalleLotes;
+window.obtenerStockDesdeLotes         = obtenerStockDesdeLotes;
+window.obtenerCostoPromedio           = obtenerCostoPromedio;
+window.sincronizarStockConLotes       = sincronizarStockConLotes;
+window.inicializarLotesDesdeStock     = inicializarLotesDesdeStock;
+window.estimarCostoFIFO               = estimarCostoFIFO;
+window.obtenerDetalleLotesIngrediente = obtenerDetalleLotesIngrediente;
+window.editarLoteFIFO                 = editarLoteFIFO;
+window.esLoteSospechosoFIFO           = esLoteSospechosoFIFO;

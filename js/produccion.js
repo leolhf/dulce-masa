@@ -318,7 +318,7 @@ function registrarProd(){
       
       // Descontar ingredientes nuevos (usando FIFO si está activo)
       let consumoNuevo = null;
-      if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
+      if(typeof consumirIngredientesFIFO === 'function' && Array.isArray(lotesIngredientes) && lotesIngredientes.length > 0){
         try{
           consumoNuevo = consumirIngredientesFIFO(recetaCalculo, tandas);
           p.costoReal = +consumoNuevo.costoTotal.toFixed(2);
@@ -361,7 +361,7 @@ function registrarProd(){
     // NUEVA producción
     if(!canProduce(recetaCalculo,tandas)){toast('Stock insuficiente');return;}
     let consumoFIFO = null;
-    if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
+    if(typeof consumirIngredientesFIFO === 'function' && Array.isArray(lotesIngredientes) && lotesIngredientes.length > 0){
       try{
         consumoFIFO = consumirIngredientesFIFO(recetaCalculo, tandas);
       }catch(e){

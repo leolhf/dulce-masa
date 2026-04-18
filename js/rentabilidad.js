@@ -14,7 +14,7 @@ function renderRentabilidad() {
 
   // ── Agrupar ventas por receta ──
   const porReceta = {};
-  ventasPer.forEach(v => {
+  ventasPer.filter(v => v.cobrado !== false).forEach(v => {
     const r = rec(v.recetaId);
     if (!r) return;
     if (!porReceta[r.id]) {
