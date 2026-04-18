@@ -1,7 +1,7 @@
 // ══════════════ SERVICE WORKER - PWA ══════════════
-const CACHE_NAME = 'dulce-masa-v17';
-const STATIC_CACHE = 'dulce-masa-static-v17';
-const DYNAMIC_CACHE = 'dulce-masa-dynamic-v17';
+const CACHE_NAME = 'dulce-masa-v18';
+const STATIC_CACHE = 'dulce-masa-static-v18';
+const DYNAMIC_CACHE = 'dulce-masa-dynamic-v18';
 
 // Archivos estáticos — rutas RELATIVAS para funcionar en cualquier subpath
 const STATIC_ASSETS = [

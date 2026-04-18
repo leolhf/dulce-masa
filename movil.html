@@ -574,23 +574,25 @@ body {
       <div class="subtitle">Modo Campo</div>
     </div>
   </div>
-  <button class="sync-btn" onclick="sincronizar()" id="sync-btn">
-    <span class="sync-icon">⟳</span>
-    <span id="sync-label">Sincronizar</span>
-    <span id="sync-badge" style="display:none;background:var(--danger);color:white;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:2px"></span>
-  </button>
-  <button class="sync-btn" onclick="subirADrive()" id="btn-subir" style="background:var(--caramel);margin-left:8px">
-    <span>☁</span>
-    <span>Subir a Drive</span>
-  </button>
-  <button class="sync-btn" onclick="instalarPWA()" id="btn-instalar-pwa" style="background:var(--ok);margin-left:8px;display:none">
-    <span>⬇</span>
-    <span>Instalar</span>
-  </button>
-  <button class="sync-btn" onclick="deshacerUltimaAccion()" id="btn-deshacer" style="background:var(--danger-bg);margin-left:8px;opacity:0.5;cursor:not-allowed" disabled title="Deshacer última acción">
-    <span>↶</span>
-    <span>Deshacer</span>
-  </button>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <button class="sync-btn" onclick="sincronizar()" id="sync-btn">
+      <span class="sync-icon">⟳</span>
+      <span id="sync-label">Sincronizar</span>
+      <span id="sync-badge" style="display:none;background:var(--danger);color:white;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:2px"></span>
+    </button>
+    <button class="sync-btn" onclick="subirADrive()" id="btn-subir" style="background:var(--caramel)">
+      <span>☁</span>
+      <span>Subir a Drive</span>
+    </button>
+    <button class="sync-btn" onclick="instalarPWA()" id="btn-instalar-pwa" style="background:var(--ok);display:none">
+      <span>⬇</span>
+      <span>Instalar</span>
+    </button>
+    <button class="sync-btn" onclick="deshacerUltimaAccion()" id="btn-deshacer" style="background:var(--danger-bg);opacity:0.5;cursor:not-allowed" disabled title="Deshacer última acción">
+      <span>↶</span>
+      <span>Deshacer</span>
+    </button>
+  </div>
 </div>
 
 <div class="ptr-indicator" id="ptr-indicator">Suelta para sincronizar</div>
@@ -846,12 +848,16 @@ body {
     <div id="stock-list"></div>
   </div>
 
-</div>
-
   <!-- SCREEN: PRODUCTOS -->
   <div class="screen" id="screen-productos">
     <div class="section-title">Stock de productos</div>
-    <div id="productos-list"></div>
+    <div id="productos-list">
+      <div class="empty-state">
+        <div class="empty-icon">Productos</div>
+        <div class="empty-title">Sin stock de productos</div>
+        <div class="empty-sub">Sincronizá para ver stock</div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -870,12 +876,12 @@ body {
   </div>
   <div class="tab" id="tab-pedidos" onclick="irA('pedidos')">
     <div class="tab-indicator"></div>
-    <div class="tab-icon">�</div>
+    <div class="tab-icon">&#x1F4CB;</div>
     <div class="tab-label">Pedidos</div>
   </div>
   <div class="tab" id="tab-compras" onclick="irA('compras')">
     <div class="tab-indicator"></div>
-    <div class="tab-icon">�️</div>
+    <div class="tab-icon">&#x1F6D2;</div>
     <div class="tab-label">Compra</div>
   </div>
   <div class="tab" id="tab-productos" onclick="irA('productos')">
@@ -894,6 +900,7 @@ body {
 // ══════════════════════════════════════════════
 const fmt = n => isNaN(n) ? '—' : '$' + Number(n).toFixed(2);
 const fmtN = (n,d=2) => isNaN(n) ? '—' : Number(n).toFixed(d);
+function escapeHTML(s){ const d=document.createElement('div');d.textContent=s??'';return d.innerHTML; }
 function today(){
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Havana',
@@ -2141,33 +2148,40 @@ function renderStockMovil(){
 function filtrarStock(){
   const cont = document.getElementById('stock-list');
   if(!_data){
-    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Sincronizá para ver el stock</div></div>`;
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x1F4E6;</div><div class="empty-title">Sincronizá para ver el stock</div></div>`;
     return;
   }
   const q = (document.getElementById('stock-q').value||'').toLowerCase();
   const lista = (_data.ingredientes||[])
     .filter(i => !q || i.nombre.toLowerCase().includes(q))
-    .map(i => ({...i, stockTotal: i.stock || 0, stockReservado: stockReservadoIng(i.id)}))
-    .filter(i => i.stockTotal > 0 || i.stockReservado > 0)
-    .sort((a,b) => a.nombre.localeCompare(b.nombre));
+    .sort((a,b) => {
+      const pa = {danger:0, warn:1, ok:2}[_stockColor(a)] ?? 3;
+      const pb = {danger:0, warn:1, ok:2}[_stockColor(b)] ?? 3;
+      return pa - pb || a.nombre.localeCompare(b.nombre);
+    });
 
   if(!lista.length){
-    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div></div>`;
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x1F50D;</div><div class="empty-title">Sin resultados</div></div>`;
     return;
   }
   cont.innerHTML = lista.map(i => {
-    const stockTxt = `${fmtN(i.stockTotal,3)} ${i.unidad}`;
-    const sc = i.stockTotal <= i.min ? 'danger' : i.stockTotal <= i.min*1.5 ? 'warn' : 'ok';
+    const sc = _stockColor(i);
+    const pct = i.min > 0 ? Math.min(100, Math.round(i.stock / i.min * 100)) : 100;
+    const stockTxt = i.stock < 1 && (i.unidad === 'kg' || i.unidad === 'l')
+      ? Math.round(i.stock * 1000) + (i.unidad === 'kg' ? 'g' : 'ml')
+      : (Math.round(i.stock * 1000) / 1000) + ' ' + i.unidad;
     return `
     <div class="list-item">
-      <div class="li-icon" style="background:var(--caramel-bg)">Compras</div>
+      <div class="li-icon" style="background:var(--${sc}-bg)">
+        ${sc === 'ok' ? '&#x2705;' : sc === 'warn' ? '&#x26A0;' : '&#x1F6A8;'}
+      </div>
       <div class="li-body">
         <div class="li-title">${i.nombre}</div>
-        <div class="prog"><div class="prog-fill" style="width:${Math.min(100, (i.stockTotal/(i.stockTotal+i.stockReservado)||0)*100)}%"></div></div>
+        <div class="prog"><div class="prog-fill ${sc}" style="width:${pct}%"></div></div>
       </div>
       <div class="li-right">
         <div class="li-val" style="color:var(--${sc})">${stockTxt}</div>
-        <div class="li-val2">mín ${i.min} ${i.unidad}</div>
+        <div class="li-val2">mín ${i.min||0} ${i.unidad}</div>
       </div>
     </div>`;
   }).join('');
@@ -2176,28 +2190,44 @@ function filtrarStock(){
 function renderProductosMovil(){
   const cont = document.getElementById('productos-list');
   if(!_data){
-    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">Productos</div><div class="empty-title">Sincronizá para ver productos</div></div>`;
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x1F9C1;</div><div class="empty-title">Sincronizá para ver productos</div></div>`;
     return;
   }
-  const lista = (_data.stockProductos||[])
-    .filter(sp => sp.stock > 0)
-    .map(sp => {
-      const r = (_data.recetas||[]).find(r => r.id == sp.recetaId);
-      return r ? { ...sp, nombre: r.nombre, precio: r.precioVenta||0 } : null;
-    })
-    .filter(Boolean)
+
+  // Calcular stock desde cero igual que la app PC
+  // para no depender de que stockProductos esté actualizado en Drive
+  const stockCalculado = (_data.recetas||[]).map(r => {
+    const totalProducido = (_data.producciones||[])
+      .filter(p => p.recetaId === r.id)
+      .reduce((a, p) => a + (p.unidadesReales || r.rinde * p.tandas), 0);
+
+    const totalVendido = (_data.ventas||[])
+      .filter(v => v.recetaId === r.id)
+      .reduce((a, v) => a + (v.unidades||0), 0);
+
+    const totalPedidosListo = (_data.pedidos||[])
+      .filter(p => p.estado === 'listo')
+      .reduce((a, p) => a + (p.items||[])
+        .filter(it => it.recetaId === r.id)
+        .reduce((b, it) => b + (it.cantidad||0), 0), 0);
+
+    const stock = Math.max(0, totalProducido - totalVendido - totalPedidosListo);
+    return { recetaId: r.id, nombre: r.nombre, precio: r.precioVenta||0, stock };
+  }).filter(sp => sp.stock > 0)
     .sort((a,b) => b.stock - a.stock);
 
-  if(!lista.length){
-    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">Productos</div><div class="empty-title">Sin stock de productos</div><div class="empty-sub">Producí algo para ver stock aquí</div></div>`;
+  if(!stockCalculado.length){
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x1F9C1;</div><div class="empty-title">Sin stock de productos</div><div class="empty-sub">Producí algo para ver stock aquí</div></div>`;
     return;
   }
-  cont.innerHTML = lista.map(sp => `
+
+  const maxStock = Math.max(...stockCalculado.map(sp => sp.stock), 1);
+  cont.innerHTML = stockCalculado.map(sp => `
     <div class="list-item">
-      <div class="li-icon" style="background:var(--ok-bg)">Productos</div>
+      <div class="li-icon" style="background:var(--ok-bg)">&#x1F9C1;</div>
       <div class="li-body">
         <div class="li-title">${sp.nombre}</div>
-        <div class="prog"><div class="prog-fill ok" style="width:${Math.min(100, sp.stock * 10)}%"></div></div>
+        <div class="prog"><div class="prog-fill ok" style="width:${Math.round(sp.stock / maxStock * 100)}%"></div></div>
       </div>
       <div class="li-right">
         <div class="li-val" style="color:var(--ok)">${sp.stock} u.</div>
