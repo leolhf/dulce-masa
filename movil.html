@@ -123,7 +123,7 @@ body {
   background: var(--card);
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   align-items: flex-start;
   padding-top: 8px;
   padding-bottom: var(--safe-bottom);
@@ -541,6 +541,26 @@ body {
 }
 .pedido-card .pc-saldo { font-size: .82rem; }
 .pedido-card .pc-btns { display: flex; gap: 6px; }
+
+/* PULL TO REFRESH */
+.ptr-indicator {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 60px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: .78rem;
+  color: var(--caramel2);
+  font-weight: 600;
+  z-index: 150;
+  transition: transform .2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.ptr-indicator.visible { transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -557,12 +577,14 @@ body {
   <button class="sync-btn" onclick="sincronizar()" id="sync-btn">
     <span class="sync-icon">⟳</span>
     <span id="sync-label">Sincronizar</span>
+    <span id="sync-badge" style="display:none;background:var(--danger);color:white;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:2px"></span>
   </button>
   <button class="sync-btn" onclick="subirADrive()" id="btn-subir" style="background:var(--caramel);margin-left:8px">
     <span>☁</span>
     <span>Subir a Drive</span>
   </button>
-  <button class="sync-btn" onclick="installPWA()" id="btn-install-pwa" style="background:var(--ok);margin-left:8px">
+  <button class="sync-btn" onclick="instalarPWA()" id="btn-instalar-pwa" style="background:var(--ok);margin-left:8px;display:none">
+    <span>⬇</span>
     <span>Instalar</span>
   </button>
   <button class="sync-btn" onclick="deshacerUltimaAccion()" id="btn-deshacer" style="background:var(--danger-bg);margin-left:8px;opacity:0.5;cursor:not-allowed" disabled title="Deshacer última acción">
@@ -570,6 +592,8 @@ body {
     <span>Deshacer</span>
   </button>
 </div>
+
+<div class="ptr-indicator" id="ptr-indicator">Suelta para sincronizar</div>
 
 <!-- CONTENT -->
 <div class="content" id="content">
@@ -715,6 +739,10 @@ body {
           <button class="btn btn-secondary btn-sm" onclick="_agregarItemPedido()" style="margin-top:4px">+ Agregar producto</button>
         </div>
 
+        <div class="total-bar" id="np-total-bar" style="display:none;margin-bottom:10px">
+          <span class="tb-label">Total del pedido</span>
+          <span class="tb-val" id="np-total">$0.00</span>
+        </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" onclick="registrarPedidoMovil()" style="flex:1">✓ Crear pedido</button>
           <button class="btn btn-secondary" onclick="_mostrarFormPedido(false)" style="flex:0 0 auto">✕</button>
@@ -820,6 +848,14 @@ body {
 
 </div>
 
+  <!-- SCREEN: PRODUCTOS -->
+  <div class="screen" id="screen-productos">
+    <div class="section-title">Stock de productos</div>
+    <div id="productos-list"></div>
+  </div>
+
+</div>
+
 <!-- BOTTOM TABS -->
 <div class="tabs">
   <div class="tab active" id="tab-inicio" onclick="irA('inicio')">
@@ -834,13 +870,18 @@ body {
   </div>
   <div class="tab" id="tab-pedidos" onclick="irA('pedidos')">
     <div class="tab-indicator"></div>
-    <div class="tab-icon">📋</div>
+    <div class="tab-icon">�</div>
     <div class="tab-label">Pedidos</div>
   </div>
   <div class="tab" id="tab-compras" onclick="irA('compras')">
     <div class="tab-indicator"></div>
-    <div class="tab-icon">🛒</div>
+    <div class="tab-icon">�️</div>
     <div class="tab-label">Compra</div>
+  </div>
+  <div class="tab" id="tab-productos" onclick="irA('productos')">
+    <div class="tab-indicator"></div>
+    <div class="tab-icon">📦</div>
+    <div class="tab-label">Productos</div>
   </div>
 </div>
 
@@ -853,7 +894,12 @@ body {
 // ══════════════════════════════════════════════
 const fmt = n => isNaN(n) ? '—' : '$' + Number(n).toFixed(2);
 const fmtN = (n,d=2) => isNaN(n) ? '—' : Number(n).toFixed(d);
-const today = () => new Date().toISOString().split('T')[0];
+function today(){
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Havana',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+}
 
 function toast(msg, ms=2500){
   const el = document.getElementById('toast');
@@ -882,6 +928,7 @@ function irA(sec){
   if(sec === 'pedidos')  renderPedidosMovil();
   if(sec === 'compras')  renderComprasMovil();
   if(sec === 'stock')    renderStockMovil();
+  if(sec === 'productos') renderProductosMovil();
 }
 
 // ══════════════════════════════════════════════
@@ -897,11 +944,16 @@ let _lastSync  = null;  // timestamp último sync exitoso
 // para que el modal "Datos en Google Drive" muestre la misma hora en ambos lados
 function _nowISOLocal(){
   const now = new Date();
-  const off = -now.getTimezoneOffset();
-  const sign = off >= 0 ? '+' : '-';
-  const hh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0');
-  const mm = String(Math.abs(off) % 60).padStart(2, '0');
-  return new Date(now.getTime() + off * 60000).toISOString().replace('Z', `${sign}${hh}:${mm}`);
+  const tz = 'America/Havana';
+  const tzStr = now.toLocaleString('en-US', { timeZone: tz });
+  const tzDate = new Date(tzStr);
+  const offsetMs = now - tzDate;
+  const offsetMin = -Math.round(offsetMs / 60000);
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offsetMin) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offsetMin) % 60).padStart(2, '0');
+  const local = new Date(now.getTime() - offsetMs);
+  return local.toISOString().replace('Z', `${sign}${hh}:${mm}`);
 }
 
 // ══════════════════════════════════════════════
@@ -1001,7 +1053,7 @@ async function sincronizar(){
         // Solo reemplazar si Drive tiene datos más nuevos o no hay datos locales
         if(!tsLocal || (tsDrive && new Date(tsDrive) > new Date(tsLocal))){
           _data     = driveData;
-          _lastSync = new Date().toISOString();
+          _lastSync = _nowISOLocal();
           await _guardarCacheIDB();
           irA(_seccion);
           toast('✓ Datos actualizados desde Drive');
@@ -1077,6 +1129,15 @@ function _actualizarSyncStatus(ok){
     dot.className    = 'sync-dot';
     text.textContent = _gasUrl ? 'Sin sincronizar · Tocá "Sincronizar"' : 'Configurá la URL de Drive';
   }
+  const badge = document.getElementById('sync-badge');
+  if(badge){
+    if(_pendiente.length > 0){
+      badge.textContent = _pendiente.length;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1114,7 +1175,7 @@ function _aplicarPendientes(){
         if(op.ventaIds) p.ventaIds = op.ventaIds;
         if(op.fechaEntregaReal) p.fechaEntregaReal = op.fechaEntregaReal;
         if(op.fechaCobro) p.fechaCobro = op.fechaCobro;
-        if(op.estado === 'entregado' && op.ventas){
+        if((op.estado === 'entregado' || op.estado === 'entregado_sin_cobrar') && op.ventas){
           if(!_data.ventas) _data.ventas = [];
           op.ventas.forEach(v => {
             // Evitar duplicados
@@ -1289,7 +1350,7 @@ function _aplicarPendientesSobre(data){
         if(op.fechaEntregaReal) p.fechaEntregaReal = op.fechaEntregaReal;
         if(op.fechaCobro) p.fechaCobro = op.fechaCobro;
         if(op.ventaIds) p.ventaIds = op.ventaIds;
-        if(op.estado === 'entregado' && op.ventas){
+        if((op.estado === 'entregado' || op.estado === 'entregado_sin_cobrar') && op.ventas){
           if(!p.ventaIds) p.ventaIds = [];
           op.ventas.forEach(v => {
             const res = _insertarRegistroUnico(data, 'ventas', v);
@@ -1335,7 +1396,7 @@ function renderInicio(){
 
   const hoyStr = today();
   const ventasHoy = (_data.ventas||[]).filter(v => v.fecha === hoyStr);
-  const ingresosHoy = ventasHoy.reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
+  const ingresosHoy = ventasHoy.filter(v => v.cobrado !== false).reduce((a,v) => a + v.unidades*v.precio + (v.propina||0), 0);
   const pedidosActivos = (_data.pedidos||[]).filter(p => p.estado !== 'entregado').length;
   const sinCobrar = (_data.pedidos||[]).filter(p => p.estado === 'entregado_sin_cobrar').length;
   const stockBajo = (_data.ingredientes||[]).filter(i => _stockColor(i) !== 'ok').length;
@@ -1493,8 +1554,9 @@ function renderVentasHoy(){
         <div class="li-title">${r ? escapeHTML(r.nombre) : '?'} ×${v.unidades} ${esPendiente ? '<span style="color:var(--warn);font-size:.7rem"> ⏳</span>' : ''}</div>
         <div class="li-sub">${escapeHTML(v.canal||'directo')}${v.nota ? ' · ' + escapeHTML(v.nota) : ''}</div>
       </div>
-      <div class="li-right">
+      <div class="li-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div class="li-val">${fmt(v.unidades * v.precio)}</div>
+        ${!esPendiente ? `<button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:.7rem" onclick="editarVentaMovil(${v.id})">Editar</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1544,9 +1606,15 @@ function _mostrarFormPedido(show = true){
     _npItems = [];
     _renderNpItems();
     // Fecha por defecto: mañana
-    const m = new Date(); m.setDate(m.getDate() + 1);
-    document.getElementById('np-fecha').value = m.toISOString().split('T')[0];
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    document.getElementById('np-fecha').value = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Havana',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(manana);
     document.getElementById('np-cliente').focus();
+    const totalBar = document.getElementById('np-total-bar');
+    if(totalBar) totalBar.style.display = 'none';
   }
 }
 
@@ -1578,6 +1646,12 @@ function _renderNpItems(){
     return;
   }
   const total = _npItems.reduce((a,it) => a + it.cantidad * it.precio, 0);
+  const totalBar = document.getElementById('np-total-bar');
+  const totalEl  = document.getElementById('np-total');
+  if(totalBar && totalEl){
+    if(total > 0){ totalBar.style.display = 'flex'; totalEl.textContent = fmt(total); }
+    else { totalBar.style.display = 'none'; }
+  }
   cont.innerHTML = _npItems.map((it, idx) =>
     `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;font-size:.9rem">${escapeHTML(it.nombre)} <span style="color:var(--text3)">×${it.cantidad}</span></div>
@@ -1730,17 +1804,35 @@ async function accionPedidoMovil(id, nuevoEstado){
 
   let ventasGeneradas = null;
   if(nuevoEstado === 'entregado_sin_cobrar'){
-    p.fechaEntregaReal = today();
-  }
-  if(nuevoEstado === 'entregado'){
     if(!_data.ventas) _data.ventas = [];
     ventasGeneradas = [];
     (p.items||[]).forEach(item => {
       const vid = _nextId('ventas');
-      const v = { id: vid, fecha: today(), recetaId: item.recetaId, unidades: item.cantidad, precio: item.precio, propina: 0, canal: 'encargo', nota: `Pedido #${p.id}: ${p.cliente}` };
+      const v = { id: vid, fecha: today(), recetaId: item.recetaId, unidades: item.cantidad, precio: item.precio, propina: 0, canal: 'encargo', cobrado: false, nota: `Pedido #${p.id}: ${p.cliente}` };
       _data.ventas.push(v);
       ventasGeneradas.push(v);
     });
+    p.fechaEntregaReal = today();
+    if(!p.ventaIds) p.ventaIds = [];
+    ventasGeneradas.forEach(v => p.ventaIds.push(v.id));
+  }
+  if(nuevoEstado === 'entregado'){
+    if(!_data.ventas) _data.ventas = [];
+    // Si viene de entregado_sin_cobrar: solo marcar como cobradas
+    if(p.estado === 'entregado_sin_cobrar' && p.ventaIds && p.ventaIds.length > 0){
+      const idsSet = new Set(p.ventaIds);
+      (_data.ventas||[]).filter(v => idsSet.has(v.id)).forEach(v => { v.cobrado = true; });
+      ventasGeneradas = (_data.ventas||[]).filter(v => idsSet.has(v.id));
+    } else {
+      // Viene directo de listo: crear las ventas
+      ventasGeneradas = [];
+      (p.items||[]).forEach(item => {
+        const vid = _nextId('ventas');
+        const v = { id: vid, fecha: today(), recetaId: item.recetaId, unidades: item.cantidad, precio: item.precio, propina: 0, canal: 'encargo', cobrado: true, nota: `Pedido #${p.id}: ${p.cliente}` };
+        _data.ventas.push(v);
+        ventasGeneradas.push(v);
+      });
+    }
     p.fechaCobro = today();
     if(!p.fechaEntregaReal) p.fechaEntregaReal = today();
   }
@@ -1815,8 +1907,12 @@ function modalCobrarMovil(id){
         <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><strong>Saldo a cobrar</strong><strong style="color:var(--${saldo>0?'danger':'ok'})">${fmt(saldo)}</strong></div>
       </div>
       ${p.fechaEntregaReal ? `<div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;text-align:center">Entregado el: ${p.fechaEntregaReal}</div>` : ''}
+      <div style="background:var(--ok-bg);border:1px solid rgba(107,175,105,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;text-align:center">
+        <div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Monto a cobrar</div>
+        <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--ok)">${fmt(saldo)}</div>
+      </div>
       <button class="btn btn-primary" style="margin-bottom:10px" onclick="document.getElementById('modal-cobrar-m').remove();accionPedidoMovil(${id},'entregado')">
-        ✅ Confirmar cobro — ${fmt(saldo)}
+        Confirmar cobro recibido
       </button>
       <button class="btn btn-secondary" style="margin-top:4px" onclick="document.getElementById('modal-cobrar-m').remove()">Cancelar</button>
     </div>`;
@@ -2039,7 +2135,6 @@ function renderComprasRecientes(){
 //  STOCK
 // ══════════════════════════════════════════════
 function renderStockMovil(){
-  document.getElementById('tab-compras').classList.add('active');
   filtrarStock();
 }
 
@@ -2052,32 +2147,23 @@ function filtrarStock(){
   const q = (document.getElementById('stock-q').value||'').toLowerCase();
   const lista = (_data.ingredientes||[])
     .filter(i => !q || i.nombre.toLowerCase().includes(q))
-    .sort((a,b) => {
-      const pa = {danger:0,warn:1,ok:2}[_stockColor(a)] ?? 3;
-      const pb = {danger:0,warn:1,ok:2}[_stockColor(b)] ?? 3;
-      return pa - pb || a.nombre.localeCompare(b.nombre);
-    });
+    .map(i => ({...i, stockTotal: i.stock || 0, stockReservado: stockReservadoIng(i.id)}))
+    .filter(i => i.stockTotal > 0 || i.stockReservado > 0)
+    .sort((a,b) => a.nombre.localeCompare(b.nombre));
 
   if(!lista.length){
     cont.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Sin resultados</div></div>`;
     return;
   }
-
   cont.innerHTML = lista.map(i => {
-    const sc = _stockColor(i);
-    const pct = i.min > 0 ? Math.min(100, Math.round(i.stock / i.min * 100)) : 100;
-    const stockTxt = i.stock < 1 && (i.unidad === 'kg' || i.unidad === 'l')
-      ? Math.round(i.stock * 1000) + (i.unidad === 'kg' ? 'g' : 'ml')
-      : (Math.round(i.stock * 1000) / 1000) + ' ' + i.unidad;
-    return `<div class="list-item">
-      <div class="li-icon" style="background:var(--${sc}-bg)">
-        ${sc === 'ok' ? '✅' : sc === 'warn' ? '⚠' : '🚨'}
-      </div>
+    const stockTxt = `${fmtN(i.stockTotal,3)} ${i.unidad}`;
+    const sc = i.stockTotal <= i.min ? 'danger' : i.stockTotal <= i.min*1.5 ? 'warn' : 'ok';
+    return `
+    <div class="list-item">
+      <div class="li-icon" style="background:var(--caramel-bg)">Compras</div>
       <div class="li-body">
         <div class="li-title">${i.nombre}</div>
-        <div class="prog">
-          <div class="prog-fill ${sc}" style="width:${pct}%"></div>
-        </div>
+        <div class="prog"><div class="prog-fill" style="width:${Math.min(100, (i.stockTotal/(i.stockTotal+i.stockReservado)||0)*100)}%"></div></div>
       </div>
       <div class="li-right">
         <div class="li-val" style="color:var(--${sc})">${stockTxt}</div>
@@ -2085,6 +2171,39 @@ function filtrarStock(){
       </div>
     </div>`;
   }).join('');
+}
+
+function renderProductosMovil(){
+  const cont = document.getElementById('productos-list');
+  if(!_data){
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">Productos</div><div class="empty-title">Sincronizá para ver productos</div></div>`;
+    return;
+  }
+  const lista = (_data.stockProductos||[])
+    .filter(sp => sp.stock > 0)
+    .map(sp => {
+      const r = (_data.recetas||[]).find(r => r.id == sp.recetaId);
+      return r ? { ...sp, nombre: r.nombre, precio: r.precioVenta||0 } : null;
+    })
+    .filter(Boolean)
+    .sort((a,b) => b.stock - a.stock);
+
+  if(!lista.length){
+    cont.innerHTML = `<div class="empty-state"><div class="empty-icon">Productos</div><div class="empty-title">Sin stock de productos</div><div class="empty-sub">Producí algo para ver stock aquí</div></div>`;
+    return;
+  }
+  cont.innerHTML = lista.map(sp => `
+    <div class="list-item">
+      <div class="li-icon" style="background:var(--ok-bg)">Productos</div>
+      <div class="li-body">
+        <div class="li-title">${sp.nombre}</div>
+        <div class="prog"><div class="prog-fill ok" style="width:${Math.min(100, sp.stock * 10)}%"></div></div>
+      </div>
+      <div class="li-right">
+        <div class="li-val" style="color:var(--ok)">${sp.stock} u.</div>
+        ${sp.precio > 0 ? `<div class="li-val2">${fmt(sp.precio)}/u</div>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 // ══════════════════════════════════════════════
@@ -2145,7 +2264,7 @@ async function _arrancar(){
 ¿Descargar igualmente desde Drive?`;
           if(confirm(msg)){
             _data     = driveData;
-            _lastSync = new Date().toISOString();
+            _lastSync = _nowISOLocal();
             await _guardarCacheIDB();
             _actualizarSyncStatus(true);
             irA(_seccion);
@@ -2186,45 +2305,12 @@ if('serviceWorker' in navigator){
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _pwaPrompt = e;
-  // Mostrar botón de instalación para Firefox
-  const installBtn = document.getElementById('btn-install-pwa');
-  if(installBtn) installBtn.style.display = 'inline-flex';
-});
-
-// Botón de instalación manual para Firefox
-window.addEventListener('load', () => {
-  const installBtn = document.getElementById('btn-install-pwa');
-  if(installBtn && !('beforeinstallprompt' in window)) {
-    // Firefox no soporta beforeinstallprompt, mostrar botón siempre
-    installBtn.style.display = 'inline-flex';
-    installBtn.onclick = () => {
-      if('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        // Firefox: intentar instalación manual
-        alert('Para instalar en Firefox: 1) Toca el menú (tres puntos) 2) "Instalar aplicación" 3) "Añadir a pantalla de inicio"');
-      } else {
-        alert('Primero espera a que la página cargue completamente');
-      }
-    };
-  }
-});
-
-async function installPWA() {
-  if(_pwaPrompt) {
-    _pwaPrompt.prompt();
-    const {outcome} = await _pwaPrompt.userChoice;
-    if(outcome === 'accepted') {
-      console.log('[Movil] Instalación aceptada');
-    }
-    _pwaPrompt = null;
-  } else {
-    // Firefox: mostrar instrucciones manuales
-    alert('Instalación manual Firefox:\n1) Toca el menú (tres puntos) en la esquina inferior derecha\n2) Selecciona "Instalar aplicación" o "Añadir a pantalla de inicio"\n3) Confirma la instalación');
-  }
-}
+  const btn = document.getElementById('btn-instalar-pwa');
+  if(btn) btn.style.display = 'flex';
 });
 window.addEventListener('appinstalled', () => {
   _pwaPrompt = null;
-  const btn = document.getElementById('btn-install-pwa');
+  const btn = document.getElementById('btn-instalar-pwa');
   if(btn) btn.style.display = 'none';
   toast('✅ App instalada correctamente');
 });
@@ -2381,7 +2467,6 @@ async function deshacerVenta(accion){
   }
   
   await _guardarCacheIDB();
-  await _guardarPendientesLocal();
 }
 
 async function deshacerPedido(accion){
@@ -2402,7 +2487,6 @@ async function deshacerPedido(accion){
   }
   
   await _guardarCacheIDB();
-  await _guardarPendientesLocal();
 }
 
 async function deshacerCompra(accion){
@@ -2429,7 +2513,6 @@ async function deshacerCompra(accion){
   }
   
   await _guardarCacheIDB();
-  await _guardarPendientesLocal();
 }
 
 async function deshacerCambioEstadoPedido(accion){
@@ -2463,6 +2546,156 @@ if(document.readyState === 'loading'){
   // El DOM ya está cargado
   _cargarHistorialDesdeStorage();
   actualizarBotonDeshacer();
+}
+
+// PULL TO REFRESH
+(function(){
+  const content  = document.getElementById('content');
+  const indicator = document.getElementById('ptr-indicator');
+  let startY = 0, pulling = false, triggered = false;
+  const THRESHOLD = 80;
+
+  content.addEventListener('touchstart', e => {
+    if(content.scrollTop === 0) {
+      startY  = e.touches[0].clientY;
+      pulling = true;
+      triggered = false;
+    }
+  }, { passive: true });
+
+  content.addEventListener('touchmove', e => {
+    if(!pulling) return;
+    const delta = e.touches[0].clientY - startY;
+    if(delta > 10 && content.scrollTop === 0){
+      if(delta > THRESHOLD && !triggered){
+        triggered = true;
+        indicator.textContent = 'Suelta para sincronizar';
+        indicator.style.borderColor = 'var(--caramel)';
+      } else if(!triggered){
+        indicator.textContent = 'Deslizá para sincronizar';
+        indicator.style.borderColor = 'var(--border)';
+      }
+      indicator.classList.add('visible');
+    }
+  }, { passive: true });
+
+  content.addEventListener('touchend', () => {
+    if(!pulling) return;
+    pulling = false;
+    indicator.classList.remove('visible');
+    if(triggered){
+      triggered = false;
+      sincronizar();
+    }
+  });
+})();
+
+function editarVentaMovil(id){
+  if(!_data) return;
+  const v = (_data.ventas||[]).find(v => v.id == id);
+  if(!v) return;
+
+  const prev = document.getElementById('modal-edit-venta-m');
+  if(prev) prev.remove();
+
+  const recetas = (_data.recetas||[]);
+  const optsRecetas = recetas.map(r =>
+    `<option value="${r.id}" ${r.id == v.recetaId ? 'selected' : ''}>${r.nombre}</option>` 
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-edit-venta-m';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:20px 20px 16px 16px;width:100%;padding:20px;max-height:85vh;overflow-y:auto">
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;color:var(--caramel2);margin-bottom:16px">Editar venta</div>
+      <div class="field">
+        <label>Producto</label>
+        <select id="ev-prod">${optsRecetas}</select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Unidades</label>
+          <input type="number" id="ev-unidades" value="${v.unidades}" min="1" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Precio/u ($)</label>
+          <input type="number" id="ev-precio" value="${v.precio}" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+      <div class="field">
+        <label>Canal</label>
+        <select id="ev-canal">
+          <option value="directo" ${v.canal==='directo'?'selected':''}>Directo</option>
+          <option value="encargo" ${v.canal==='encargo'?'selected':''}>Encargo</option>
+          <option value="delivery" ${v.canal==='delivery'?'selected':''}>Delivery</option>
+          <option value="evento" ${v.canal==='evento'?'selected':''}>Evento</option>
+          <option value="otro" ${v.canal==='otro'?'selected':''}>Otro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nota</label>
+        <input type="text" id="ev-nota" value="${v.nota||''}">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" style="flex:1" onclick="_guardarEdicionVenta(${id})">Guardar</button>
+        <button class="btn btn-danger" style="flex:0 0 auto" onclick="_eliminarVentaMovil(${id})">Eliminar</button>
+        <button class="btn btn-secondary" style="flex:0 0 auto" onclick="document.getElementById('modal-edit-venta-m').remove()">Cancelar</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function _guardarEdicionVenta(id){
+  if(!_data) return;
+  const v = (_data.ventas||[]).find(v => v.id == id);
+  if(!v){ toast('Venta no encontrada'); return; }
+
+  const recetaId = parseInt(document.getElementById('ev-prod').value);
+  const unidades = parseInt(document.getElementById('ev-unidades').value)||0;
+  const precio   = parseFloat(document.getElementById('ev-precio').value)||0;
+  const canal    = document.getElementById('ev-canal').value;
+  const nota     = document.getElementById('ev-nota').value.trim();
+
+  if(!recetaId || unidades <= 0 || precio <= 0){
+    toast('Completá todos los campos'); return;
+  }
+
+  // Ajustar stock si cambió receta o cantidad
+  const spAnterior = (_data.stockProductos||[]).find(s => s.recetaId == v.recetaId);
+  const spNuevo    = (_data.stockProductos||[]).find(s => s.recetaId == recetaId);
+
+  if(v.recetaId !== recetaId){
+    if(spAnterior) spAnterior.stock = Math.max(0, spAnterior.stock + v.unidades);
+    if(spNuevo)    spNuevo.stock    = Math.max(0, spNuevo.stock - unidades);
+  } else if(v.unidades !== unidades){
+    const diff = unidades - v.unidades;
+    if(spAnterior) spAnterior.stock = Math.max(0, spAnterior.stock - diff);
+  }
+
+  Object.assign(v, { recetaId, unidades, precio, canal, nota });
+
+  document.getElementById('modal-edit-venta-m').remove();
+  _guardarCacheIDB();
+  renderVentasMovil();
+  toast('Venta actualizada');
+}
+
+function _eliminarVentaMovil(id){
+  if(!_data) return;
+  if(!confirm('¿Eliminar esta venta?')) return;
+  const idx = (_data.ventas||[]).findIndex(v => v.id == id);
+  if(idx === -1) return;
+  const v  = _data.ventas[idx];
+  const sp = (_data.stockProductos||[]).find(s => s.recetaId == v.recetaId);
+  if(sp) sp.stock = Math.max(0, sp.stock + v.unidades);
+  _data.ventas.splice(idx, 1);
+  document.getElementById('modal-edit-venta-m').remove();
+  _guardarCacheIDB();
+  renderVentasMovil();
+  toast('Venta eliminada');
 }
 
 </script>
