@@ -562,8 +562,7 @@ body {
     <span>☁</span>
     <span>Subir a Drive</span>
   </button>
-  <button class="sync-btn" onclick="instalarPWA()" id="btn-instalar-pwa" style="background:var(--ok);margin-left:8px;display:none">
-    <span>⬇</span>
+  <button class="sync-btn" onclick="installPWA()" id="btn-install-pwa" style="background:var(--ok);margin-left:8px">
     <span>Instalar</span>
   </button>
   <button class="sync-btn" onclick="deshacerUltimaAccion()" id="btn-deshacer" style="background:var(--danger-bg);margin-left:8px;opacity:0.5;cursor:not-allowed" disabled title="Deshacer última acción">
@@ -2187,12 +2186,45 @@ if('serviceWorker' in navigator){
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _pwaPrompt = e;
-  const btn = document.getElementById('btn-instalar-pwa');
-  if(btn) btn.style.display = 'flex';
+  // Mostrar botón de instalación para Firefox
+  const installBtn = document.getElementById('btn-install-pwa');
+  if(installBtn) installBtn.style.display = 'inline-flex';
+});
+
+// Botón de instalación manual para Firefox
+window.addEventListener('load', () => {
+  const installBtn = document.getElementById('btn-install-pwa');
+  if(installBtn && !('beforeinstallprompt' in window)) {
+    // Firefox no soporta beforeinstallprompt, mostrar botón siempre
+    installBtn.style.display = 'inline-flex';
+    installBtn.onclick = () => {
+      if('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        // Firefox: intentar instalación manual
+        alert('Para instalar en Firefox: 1) Toca el menú (tres puntos) 2) "Instalar aplicación" 3) "Añadir a pantalla de inicio"');
+      } else {
+        alert('Primero espera a que la página cargue completamente');
+      }
+    };
+  }
+});
+
+async function installPWA() {
+  if(_pwaPrompt) {
+    _pwaPrompt.prompt();
+    const {outcome} = await _pwaPrompt.userChoice;
+    if(outcome === 'accepted') {
+      console.log('[Movil] Instalación aceptada');
+    }
+    _pwaPrompt = null;
+  } else {
+    // Firefox: mostrar instrucciones manuales
+    alert('Instalación manual Firefox:\n1) Toca el menú (tres puntos) en la esquina inferior derecha\n2) Selecciona "Instalar aplicación" o "Añadir a pantalla de inicio"\n3) Confirma la instalación');
+  }
+}
 });
 window.addEventListener('appinstalled', () => {
   _pwaPrompt = null;
-  const btn = document.getElementById('btn-instalar-pwa');
+  const btn = document.getElementById('btn-install-pwa');
   if(btn) btn.style.display = 'none';
   toast('✅ App instalada correctamente');
 });
