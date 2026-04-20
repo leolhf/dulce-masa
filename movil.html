@@ -249,11 +249,12 @@ select option{background:#1a1008}
     </div>
     <div class="card">
       <div class="ch">🗄 Herramientas</div>
-      <div class="g2" style="gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button class="btn btn-ok" onclick="exportJSON()">↓ Exportar</button>
         <button class="btn btn-w" onclick="importJSON()">↑ Importar</button>
         <button class="btn" onclick="configDrive()">⚙ Drive URL</button>
         <button class="btn btn-d" onclick="undoLast()">↩ Deshacer</button>
+        <button class="btn btn-d" onclick="confirmDeleteAll()" style="grid-column:1/-1"> Borrar todos los datos</button>
       </div>
     </div>
     <div class="syncbar" id="syncBar"><span class="dot" id="syncDot"></span><span id="syncTxt">Iniciando…</span></div>
@@ -411,14 +412,30 @@ const DB_NAME   = 'dm-v2';
 const TZ        = 'America/Argentina/Buenos_Aires';
 
 // ── ESTADO GLOBAL ────────────────────────────────────────
-let events   = [];   // Registro de eventos (fuente de verdad)
-let state    = {};   // Estado derivado (cache)
-let gasUrl   = localStorage.getItem('dm2_gas') || '';
-let deviceId = localStorage.getItem('dm2_dev') || (() => {
-  const d = uuidv4(); localStorage.setItem('dm2_dev', d); return d;
-})();
-let lastActionId = null;  // Para "deshacer"
-let lowOpen      = false;
+let ingredientes = [];
+let recetas = [];
+let ventas = [];
+let pedidos = [];
+let producciones = [];
+let mermas = [];
+let extracciones = [];
+let proveedores = [];
+let historialCompras = [];
+let stockProductos = [];
+let lotesIngredientes = [];
+let catRecetas = ['Tortas','Cupcakes','Galletas','Facturas','Panes','Alfajores','Otros'];
+let gastosFijos = [];
+let prestamos = [];
+let metas = [];
+let capital_ajustes = [];
+
+let nextId = {
+  ing: 1, rec: 1, prod: 1, venta: 1, comp: 1,
+  prov: 1, pedido: 1, ext: 1, prestamo: 1, lote: 1, merma: 1
+};
+
+let gasUrl = localStorage.getItem('gas_url') || '';
+let lowOpen = false;
 
 // ── UUID ─────────────────────────────────────────────────
 function uuidv4() {
@@ -427,6 +444,31 @@ function uuidv4() {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
+}
+
+// Función para generar IDs únicos - igual que en la app de escritorio
+function nextIdGenerator(prefix) {
+  const id = nextId[prefix] || 1;
+  nextId[prefix] = id + 1;
+  return id;
+}
+
+// Función buildData - igual que en la app de escritorio
+function buildData() {
+  return {
+    _version: 2,
+    _guardado: new Date().toISOString(),  // Simplificado para móvil
+    ingredientes, recetas, producciones, ventas, pedidos,
+    stockProductos, proveedores, historialCompras, lotesIngredientes, catRecetas, gastosFijos, extracciones, prestamos, metas, mermas,
+    capital_ajustes: capital_ajustes || [],
+    nextId: {
+      ing: nextId?.ing || 1, rec: nextId?.rec || 1, prod: nextId?.prod || 1,
+      venta: nextId?.venta || 1, comp: nextId?.comp || 1,
+      prov: nextId?.prov || 1, pedido: nextId?.pedido || pedidos?.length + 1 || 1,
+      ext: nextId?.ext || 1, prestamo: nextId?.prestamo || 1, lote: nextId?.lote || 1,
+      merma: nextId?.merma || 1
+    }
+  };
 }
 
 // ── FECHAS / FORMATO ─────────────────────────────────────
@@ -536,11 +578,14 @@ function deriveState(evts) {
         break;
       }
       case 'undo_compra': {
-        const c=s.compras[p.id];
-        if(c && s.ingredientes[c.ingId])
+        const c = s.compras[p.id];
+        if (c && s.ingredientes[c.ingId]) {
+          // CORREGIDO: Reducir stock al deshacer compra
           s.ingredientes[c.ingId].stock = Math.max(0,
-            Number(s.ingredientes[c.ingId].stock||0)-Number(c.qty||0));
-        delete s.compras[p.id]; break;
+            Number(s.ingredientes[c.ingId].stock||0) - Number(c.qty||0));
+        }
+        delete s.compras[p.id]; 
+        break;
       }
 
       // ── Producción
@@ -620,31 +665,20 @@ function setSyncStatus(text, mode='') {
   dot.className = 'dot'+(mode?' '+mode:'');
 }
 
-async function fetchDriveEvents() {
+async function fetchDriveData() {
   const res = await fetch(gasUrl+'?action=load&t='+Date.now());
   if(!res.ok) throw new Error('HTTP '+res.status);
   const r = await res.json();
   if(r.status==='empty') return null;
   if(r.status!=='ok') throw new Error(r.message||'Error Drive');
   const raw = typeof r.data==='string' ? JSON.parse(r.data) : r.data;
-  
-  // Si ya está en formato de eventos (nuevo sistema)
-  if (Array.isArray(raw.events)) {
-    return raw.events;
-  }
-  
-  // Si está en formato antiguo (sistema original) - convertir a eventos
-  if (raw.ingredientes || raw.recetas || raw.ventas) {
-    return convertLegacyDataToEvents(raw);
-  }
-  
-  return null;
+  return raw;
 }
 
 // Convierte datos del formato antiguo al nuevo sistema de eventos
 function convertLegacyDataToEvents(legacyData) {
   const convertedEvents = [];
-  const timestamp = now();
+  const baseTimestamp = now();
   
   // Convertir ingredientes
   if (Array.isArray(legacyData.ingredientes)) {
@@ -660,7 +694,7 @@ function convertLegacyDataToEvents(legacyData) {
           min: ing.min || 0,
           precio: ing.precio || 0
         },
-        ts: timestamp,
+        ts: baseTimestamp,
         device: 'legacy-import'
       });
     });
@@ -678,15 +712,27 @@ function convertLegacyDataToEvents(legacyData) {
           rinde: rec.rinde || 1,
           precio: rec.precioVenta || 0
         },
-        ts: timestamp,
+        ts: baseTimestamp,
         device: 'legacy-import'
       });
     });
   }
   
-  // Convertir ventas
+  // Convertir ventas - PRESERVAR TIMESTAMP ORIGINAL
   if (Array.isArray(legacyData.ventas)) {
     legacyData.ventas.forEach(v => {
+      // Usar la fecha de la venta como timestamp para mantener orden cronológico
+      let eventTs = baseTimestamp;
+      if (v.fecha) {
+        try {
+          const dateObj = new Date(v.fecha);
+          if (!isNaN(dateObj.getTime())) {
+            eventTs = dateObj.toISOString();
+          }
+        } catch(e) {
+          console.warn('Fecha inválida en venta:', v.fecha, 'usando timestamp base');
+        }
+      }
       convertedEvents.push({
         id: uuidv4(),
         type: 'add_venta',
@@ -700,15 +746,27 @@ function convertLegacyDataToEvents(legacyData) {
           nota: v.nota || '',
           cobrado: v.cobrado !== false
         },
-        ts: timestamp,
+        ts: eventTs,
         device: 'legacy-import'
       });
     });
   }
   
-  // Convertir pedidos
+  // Convertir pedidos - PRESERVAR TIMESTAMP ORIGINAL
   if (Array.isArray(legacyData.pedidos)) {
     legacyData.pedidos.forEach(p => {
+      // Usar la fecha del pedido como timestamp para mantener orden cronológico
+      let eventTs = baseTimestamp;
+      if (p.fecha) {
+        try {
+          const dateObj = new Date(p.fecha);
+          if (!isNaN(dateObj.getTime())) {
+            eventTs = dateObj.toISOString();
+          }
+        } catch(e) {
+          console.warn('Fecha inválida en pedido:', p.fecha, 'usando timestamp base');
+        }
+      }
       convertedEvents.push({
         id: uuidv4(),
         type: 'add_pedido',
@@ -721,7 +779,7 @@ function convertLegacyDataToEvents(legacyData) {
           estado: p.estado || 'pendiente',
           items: p.items || []
         },
-        ts: timestamp,
+        ts: eventTs,
         device: 'legacy-import'
       });
     });
@@ -838,44 +896,182 @@ async function pushDriveEvents(evts) {
 
 async function syncNow() {
   if(!gasUrl) return configDrive();
-  setSyncStatus('Sincronizando…','syncing');
+  setSyncStatus('Sincronizando','syncing');
   try {
-    const remote = await fetchDriveEvents();
+    const remote = await fetchDriveData();
 
     if(!remote) {
-      // Drive vacío → preguntar si subir
-      if(events.length===0) { setSyncStatus('Drive vacío · sin datos locales'); return; }
-      showModal('☁ Drive vacío',
-        `Tienes ${events.length} eventos locales. ¿Subir a Drive ahora?`,
-        [{label:'Sí, subir ☁', cls:'btn-p', fn:uploadNow},
+      // Drive vacío -> preguntar si subir
+      if(!hasLocalData()) { setSyncStatus('Drive vacío · sin datos locales'); return; }
+      showModal(' Drive vacío',
+        `Tienes datos locales. ¿Subir a Drive ahora?`,
+        [{label:'Sí, subir ', cls:'btn-p', fn:uploadNow},
          {label:'Cancelar',   cls:'',      fn:()=>{}}]);
       return;
     }
 
-    // ← AQUÍ ESTÁ LA MAGIA: merge sin conflictos
-    const merged  = mergeEvents(events, remote);
-    const newEvts = merged.length - events.length;
+    // Hay datos en Drive -> ofrecer opciones
+    const localData = buildData();
+    const hasDiff = JSON.stringify(localData) !== JSON.stringify(remote);
 
-    events = merged;
-    state  = deriveState(events);
-    await dbSet('events', events);
-    await pushDriveEvents(events);
-
-    setSyncStatus(`Sync OK · ${events.length} eventos · ${now().slice(11,16)}`, 'ok');
-    toast(newEvts>0 ? `✓ Sync · +${newEvts} eventos nuevos` : '✓ Ya estaba sincronizado');
-    renderAll();
+    if (hasDiff) {
+      showModal(' Sincronización necesaria',
+        `Hay diferencias entre datos locales y Drive.<br><br>
+        ¿Qué quieres hacer?`,
+        [
+          {label:' Fusionar datos', cls:'btn-p', fn:()=>{
+            mergeAndSync(remote);
+          }},
+          {label:' Reemplazar local', cls:'btn-w', fn:()=>{
+            replaceLocalWithRemote(remote);
+          }},
+          {label:' Reemplazar Drive', cls:'btn-d', fn:()=>{
+            replaceRemoteWithLocal();
+          }},
+          {label:'Cancelar', cls:'', fn:()=>{}}
+        ]);
+    } else {
+      // Ya están sincronizados
+      setSyncStatus(`Sync OK · ${now().slice(11,16)}`, 'ok');
+      toast(' Ya está sincronizado');
+    }
   } catch(e) {
     setSyncStatus('Error: '+e.message);
     toast('Error de sync: '+e.message);
   }
 }
 
+// Función auxiliar para verificar si hay datos locales
+function hasLocalData() {
+  return ingredientes.length > 0 || recetas.length > 0 || ventas.length > 0 || 
+         pedidos.length > 0 || producciones.length > 0 || mermas.length > 0;
+}
+
+// Fusionar datos locales y remotos
+async function mergeAndSync(remote) {
+  setSyncStatus('Fusionando datos','syncing');
+  try {
+    // Fusionar arrays manteniendo IDs únicos
+    const merged = {
+      ingredientes: mergeArrays(ingredientes, remote.ingredientes || [], 'id'),
+      recetas: mergeArrays(recetas, remote.recetas || [], 'id'),
+      ventas: mergeArrays(ventas, remote.ventas || [], 'id'),
+      pedidos: mergeArrays(pedidos, remote.pedidos || [], 'id'),
+      producciones: mergeArrays(producciones, remote.producciones || [], 'id'),
+      mermas: mergeArrays(mermas, remote.mermas || [], 'id'),
+      extracciones: mergeArrays(extracciones, remote.extracciones || [], 'id'),
+      proveedores: mergeArrays(proveedores, remote.proveedores || [], 'id'),
+      historialCompras: mergeArrays(historialCompras, remote.historialCompras || [], 'id'),
+      stockProductos: mergeArrays(stockProductos, remote.stockProductos || [], 'recetaId'),
+      lotesIngredientes: mergeArrays(lotesIngredientes, remote.lotesIngredientes || [], 'id'),
+      gastosFijos: mergeArrays(gastosFijos, remote.gastosFijos || [], 'id'),
+      prestamos: mergeArrays(prestamos, remote.prestamos || [], 'id'),
+      metas: mergeArrays(metas, remote.metas || [], 'id'),
+      capital_ajustes: mergeArrays(capital_ajustes, remote.capital_ajustes || [], 'id')
+    };
+
+    // Actualizar variables globales
+    Object.assign(this, merged);
+    await saveLocal();
+    await uploadNow(false);
+
+    setSyncStatus(`Fusión OK · ${now().slice(11,16)}`, 'ok');
+    toast(' Datos fusionados correctamente');
+    renderAll();
+  } catch(e) {
+    setSyncStatus('Error: '+e.message);
+    toast('Error en fusión: '+e.message);
+  }
+}
+
+// Reemplazar datos locales con los de Drive
+async function replaceLocalWithRemote(remote) {
+  setSyncStatus('Reemplazando datos locales','syncing');
+  try {
+    // Cargar datos remotos en variables globales
+    loadFromData(remote);
+    await saveLocal();
+
+    setSyncStatus(`Reemplazo OK · ${now().slice(11,16)}`, 'ok');
+    toast(' Datos locales reemplazados');
+    renderAll();
+  } catch(e) {
+    setSyncStatus('Error: '+e.message);
+    toast('Error al reemplazar: '+e.message);
+  }
+}
+
+// Reemplazar datos en Drive con los locales
+async function replaceRemoteWithLocal() {
+  setSyncStatus('Reemplazando Drive','syncing');
+  try {
+    const data = buildData();
+    const body = JSON.stringify(data, null, 2);
+    const res = await fetch(gasUrl, {method:'POST',
+      headers:{'Content-Type':'text/plain'}, body});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const r = await res.json();
+    if(r.status!=='ok') throw new Error(r.message||'Error al guardar');
+
+    setSyncStatus(`Drive reemplazado · ${now().slice(11,16)}`, 'ok');
+    toast(' Drive reemplazado');
+  } catch(e) {
+    setSyncStatus('Error: '+e.message);
+    toast('Error al reemplazar Drive: '+e.message);
+  }
+}
+
+// Función auxiliar para fusionar arrays sin duplicados
+function mergeArrays(local, remote, keyField) {
+  const merged = [...local];
+  const existingKeys = new Set(local.map(item => item[keyField]));
+  
+  remote.forEach(item => {
+    if (!existingKeys.has(item[keyField])) {
+      merged.push(item);
+    }
+  });
+  
+  return merged;
+}
+
+// Función para cargar datos desde objeto data
+function loadFromData(data) {
+  ingredientes = data.ingredientes || [];
+  recetas = data.recetas || [];
+  ventas = data.ventas || [];
+  pedidos = data.pedidos || [];
+  producciones = data.producciones || [];
+  mermas = data.mermas || [];
+  extracciones = data.extracciones || [];
+  proveedores = data.proveedores || [];
+  historialCompras = data.historialCompras || [];
+  stockProductos = data.stockProductos || [];
+  lotesIngredientes = data.lotesIngredientes || [];
+  catRecetas = data.catRecetas || ['Tortas','Cupcakes','Galletas','Facturas','Panes','Alfajores','Otros'];
+  gastosFijos = data.gastosFijos || [];
+  prestamos = data.prestamos || [];
+  metas = data.metas || [];
+  capital_ajustes = data.capital_ajustes || [];
+  
+  if (data.nextId) {
+    Object.assign(nextId, data.nextId);
+  }
+}
+
 async function uploadNow(showMsg=true) {
   if(!gasUrl) return configDrive();
   try {
-    await pushDriveEvents(events);
-    setSyncStatus(`Subido · ${events.length} eventos · ${now().slice(11,16)}`, 'ok');
-    if(showMsg) toast(`☁ Subido (${events.length} eventos)`);
+    const data = buildData();
+    const body = JSON.stringify(data, null, 2);
+    const res = await fetch(gasUrl, {method:'POST',
+      headers:{'Content-Type':'text/plain'}, body});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const r = await res.json();
+    if(r.status!=='ok') throw new Error(r.message||'Error al guardar');
+
+    setSyncStatus(`Subido · ${now().slice(11,16)}`, 'ok');
+    if(showMsg) toast(' Subido correctamente');
   } catch(e) { toast('Error al subir: '+e.message); }
 }
 
@@ -884,8 +1080,8 @@ function configDrive() {
   if(url===null) return;
   if(!url.trim().startsWith('https://')) return toast('URL inválida');
   gasUrl = url.trim();
-  localStorage.setItem('dm2_gas', gasUrl);
-  toast('✓ Drive URL configurada');
+  localStorage.setItem('gas_url', gasUrl);
+  toast('✓ URL de Drive configurada');
   setSyncStatus('Drive listo · Presiona Sync', 'ok');
 }
 
@@ -907,16 +1103,40 @@ function showModal(title, body, btns) {
 // ════════════════════════════════════════════════════════
 //  HELPERS DE ESTADO
 // ════════════════════════════════════════════════════════
-const recById  = id => state.recetas.find(r=>r.id===id);
-const ingById  = id => state.ingredientes.find(i=>i.id===id);
-const ingByNom = n  => state.ingredientes.find(i=>(i.nombre||'').toLowerCase()===n.toLowerCase());
-const provByNom= n  => state.proveedores.find(p=>(p.nombre||'').toLowerCase()===n.toLowerCase());
+const recById  = id => recetas.find(r=>r.id===id);
+const ingById  = id => ingredientes.find(i=>i.id===id);
+const ingByNom = n  => ingredientes.find(i=>(i.nombre||'').toLowerCase()===n.toLowerCase());
+const provByNom= n  => proveedores.find(p=>(p.nombre||'').toLowerCase()===n.toLowerCase());
 
 function stockProducto(recetaId) {
-  const prod  = state.producciones.filter(p=>p.recetaId===recetaId).reduce((a,p)=>a+Number(p.unidadesReales||0),0);
-  const vend  = state.ventas.filter(v=>v.recetaId===recetaId).reduce((a,v)=>a+Number(v.unidades||0),0);
-  const merma = state.mermas.filter(m=>m.recetaId===recetaId).reduce((a,m)=>a+Number(m.cantidad||0),0);
-  return Math.max(0, prod-vend-merma);
+  const prod  = producciones.filter(p=>p.recetaId===recetaId).reduce((a,p)=>a+Number(p.unidadesReales||0),0);
+  const vend  = ventas.filter(v=>v.recetaId===recetaId).reduce((a,v)=>a+Number(v.unidades||0),0);
+  const merma = mermas.filter(m=>m.recetaId===recetaId).reduce((a,m)=>a+Number(m.cantidad||0),0);
+  
+  // Descontar pedidos con estado "listo" (producto reservado pero no entregado)
+  const pedidosListo = pedidos
+    .filter(p=>p.estado==='listo')
+    .reduce((a,p)=>a + (p.items||[]).filter(it=>it.recetaId===recetaId).reduce((b,it)=>b+Number(it.cantidad||0),0),0);
+  
+  const resultado = Math.max(0, prod-vend-merma-pedidosListo);
+  
+  // Debug: mostrar desglose en consola
+  const receta = recetas.find(r=>r.id===recetaId);
+  if(receta && receta.nombre?.includes('Donitas')) {
+    console.log(`[DEBUG MÓVIL] ${receta.nombre}:`, {
+      recetaId,
+      producciones: prod,
+      ventas: vend,
+      mermas: merma,
+      pedidosListo: pedidosListo,
+      resultado: resultado,
+      totalProducciones: producciones.filter(p=>p.recetaId===recetaId).length,
+      totalVentas: ventas.filter(v=>v.recetaId===recetaId).length,
+      totalPedidosListo: pedidos.filter(p=>p.estado==='listo' && p.items?.some(it=>it.recetaId===recetaId)).length
+    });
+  }
+  
+  return resultado;
 }
 
 // ════════════════════════════════════════════════════════
@@ -927,8 +1147,20 @@ async function addReceta() {
   const nombre = $('rNom').value.trim();
   const rinde  = Number($('rRin').value||0);
   if(!nombre) return toast('Escribe el nombre de la receta');
-  const ev = await dispatch('add_receta',{id:uuidv4(),nombre,rinde,precio:0});
-  lastActionId = ev.id; $('rNom').value=''; toast('✓ Receta agregada');
+  
+  const nuevaReceta = {
+    id: nextIdGenerator('rec'),
+    nombre: nombre,
+    rinde: rinde || 1,
+    precioVenta: 0
+  };
+  
+  recetas.push(nuevaReceta);
+  await saveLocal();
+  renderAll();
+  
+  $('rNom').value = '';
+  toast(' Receta agregada');
 }
 
 async function addVenta() {
@@ -938,12 +1170,25 @@ async function addVenta() {
   if(!recetaId||uni<=0||pre<=0) return toast('Completa todos los campos');
   const stk = stockProducto(recetaId);
   if(uni>stk) return toast(`Stock insuficiente · hay ${stk}u`);
-  const ev = await dispatch('add_venta',{
-    id:uuidv4(), fecha:today(), recetaId, unidades:uni, precio:pre,
-    canal:$('vCan').value, nota:$('vNota').value.trim(), cobrado:true
-  });
-  lastActionId=ev.id; $('vUni').value='1'; $('vNota').value='';
-  toast('✓ Venta guardada');
+  
+  const nuevaVenta = {
+    id: nextIdGenerator('venta'),
+    fecha: today(),
+    recetaId: recetaId,
+    unidades: uni,
+    precio: pre,
+    canal: $('vCan').value,
+    nota: $('vNota').value.trim(),
+    cobrado: true
+  };
+  
+  ventas.push(nuevaVenta);
+  await saveLocal();
+  renderAll();
+  
+  $('vUni').value = '1';
+  $('vNota').value = '';
+  toast(' Venta guardada');
 }
 
 async function addPedido() {
@@ -952,39 +1197,82 @@ async function addPedido() {
   const cant     = Number($('pCan').value||0);
   const pre      = Number($('pPre').value||0);
   if(!cliente||!recetaId||cant<=0) return toast('Completa cliente, receta y cantidad');
-  const ev = await dispatch('add_pedido',{
-    id:uuidv4(), fecha:today(), cliente,
-    fechaEntrega:$('pFec').value||null,
-    anticipo:Number($('pAnt').value||0),
-    estado:'pendiente',
-    items:[{recetaId,cantidad:cant,precio:pre}]
-  });
-  lastActionId=ev.id; $('pCli').value=''; $('pAnt').value='';
-  toast('✓ Pedido guardado');
+  
+  const nuevoPedido = {
+    id: nextIdGenerator('pedido'),
+    fecha: today(),
+    cliente: cliente,
+    fechaEntrega: $('pFec').value || null,
+    anticipo: Number($('pAnt').value||0),
+    estado: 'pendiente',
+    items: [{recetaId, cantidad: cant, precio: pre}]
+  };
+  
+  pedidos.push(nuevoPedido);
+  await saveLocal();
+  renderAll();
+  
+  $('pCli').value = '';
+  $('pAnt').value = '';
+  toast(' Pedido guardado');
 }
 
 async function addCompra() {
   const nombre = $('cIng').value.trim();
   const qty    = Number($('cQty').value||0);
   const precio = Number($('cPre').value||0);
-  if(!nombre||qty<=0) return toast('Completa ingrediente y cantidad');
+  if(!nombre||qty<=0||precio<=0) return toast('Completa ingrediente, cantidad y precio');
 
   let ing    = ingByNom(nombre);
-  let ingId  = ing ? ing.id : uuidv4();
-  if(!ing) await dispatch('add_ingrediente',{id:ingId,nombre,unidad:'kg',stock:0,min:0,precio:precio||0});
+  let ingId  = ing ? ing.id : nextIdGenerator('ing');
+  if(!ing) {
+    ingredientes.push({
+      id: ingId,
+      nombre: nombre,
+      unidad: 'kg',
+      stock: 0,
+      min: 0,
+      precio: precio || 0
+    });
+  }
 
   let provId = null;
   const pNom = $('cPro').value.trim();
   if(pNom) {
     let prov = provByNom(pNom);
-    if(!prov) { provId=uuidv4(); await dispatch('add_proveedor',{id:provId,nombre:pNom}); }
-    else provId=prov.id;
+    if(!prov) { 
+      provId = nextIdGenerator('prov');
+      proveedores.push({id: provId, nombre: pNom});
+    }
+    else provId = prov.id;
   }
 
-  const ev = await dispatch('add_compra',{id:uuidv4(),ingId,ingNombre:nombre,qty,precio,fecha:today(),provId});
-  lastActionId=ev.id;
-  $('cIng').value=''; $('cQty').value=''; $('cPre').value=''; $('cPro').value='';
-  toast('✓ Compra guardada');
+  const nuevaCompra = {
+    id: nextIdGenerator('comp'),
+    ingId: ingId,
+    ingNombre: nombre,
+    qty: qty,
+    precio: precio,
+    fecha: today(),
+    provId: provId
+  };
+  
+  historialCompras.push(nuevaCompra);
+  
+  // Actualizar stock del ingrediente
+  if(ing) {
+    ing.stock = Number(ing.stock || 0) + qty;
+    if(precio > 0) ing.precio = precio;
+  }
+  
+  await saveLocal();
+  renderAll();
+  
+  $('cIng').value = '';
+  $('cQty').value = '';
+  $('cPre').value = '';
+  $('cPro').value = '';
+  toast(' Compra guardada');
 }
 
 async function addProduccion() {
@@ -994,9 +1282,22 @@ async function addProduccion() {
   if(!recetaId||tandas<=0) return toast('Selecciona receta y tandas');
   const rec = recById(recetaId);
   const unidadesReales = reales>0 ? reales : (Number(rec?.rinde||0)*tandas);
-  const ev = await dispatch('add_produccion',{id:uuidv4(),fecha:today(),recetaId,tandas,unidadesReales});
-  lastActionId=ev.id; $('prTan').value='1'; $('prReal').value='';
-  toast('✓ Producción guardada');
+  
+  const nuevaProduccion = {
+    id: nextIdGenerator('prod'),
+    fecha: today(),
+    recetaId: recetaId,
+    tandas: tandas,
+    unidadesReales: unidadesReales
+  };
+  
+  producciones.push(nuevaProduccion);
+  await saveLocal();
+  renderAll();
+  
+  $('prTan').value = '1';
+  $('prReal').value = '';
+  toast(' Producción guardada');
 }
 
 async function addMerma() {
@@ -1005,43 +1306,51 @@ async function addMerma() {
   if(!recetaId||cant<=0) return toast('Completa receta y cantidad');
   const stk = stockProducto(recetaId);
   if(cant>stk) return toast(`Stock insuficiente · hay ${stk}u`);
-  const ev = await dispatch('add_merma',{
-    id:uuidv4(), fecha:today(), recetaId, cantidad:cant,
-    motivo:$('mMot').value||'No especificado'
-  });
-  lastActionId=ev.id; $('mCan').value='1';
-  toast('✓ Merma registrada');
+  
+  const nuevaMerma = {
+    id: nextIdGenerator('merma'),
+    fecha: today(),
+    recetaId: recetaId,
+    cantidad: cant,
+    motivo: $('mMot').value || 'No especificado'
+  };
+  
+  mermas.push(nuevaMerma);
+  await saveLocal();
+  renderAll();
+  
+  $('mCan').value = '1';
+  toast(' Merma registrada');
 }
 
 async function addExtraccion() {
   const monto = Number($('fMon').value||0);
   if(monto<=0) return toast('Monto inválido');
-  const ev = await dispatch('add_extraccion',{
-    id:uuidv4(), fecha:today(), tipo:'retiro', monto, concepto:'Extracción móvil'
-  });
-  lastActionId=ev.id; $('fMon').value='';
-  toast('✓ Extracción registrada');
+  
+  const nuevaExtraccion = {
+    id: nextIdGenerator('ext'),
+    fecha: today(),
+    tipo: 'retiro',
+    monto: monto,
+    concepto: 'Extracción móvil'
+  };
+  
+  extracciones.push(nuevaExtraccion);
+  await saveLocal();
+  renderAll();
+  
+  $('fMon').value = '';
+  toast(' Extracción registrada');
 }
 
+// Función simplificada de deshacer - eliminada por ahora ya que no hay sistema de eventos
 async function undoLast() {
-  if(!lastActionId) return toast('Sin acción reciente para deshacer');
-  const last = events.find(e=>e.id===lastActionId);
-  if(!last) return toast('Acción no encontrada');
-  const map = {
-    add_venta:'undo_venta', add_pedido:'undo_pedido',
-    add_compra:'undo_compra', add_produccion:'undo_produccion',
-    add_merma:'undo_merma', add_extraccion:'undo_extraccion',
-    add_receta:'del_receta'
-  };
-  const undoType = map[last.type];
-  if(!undoType) return toast('Esta acción no se puede deshacer');
-  await dispatch(undoType,{id:last.payload.id});
-  lastActionId=null; toast('↩ Deshecho');
+  toast(' Función deshacer no disponible en el sistema actual');
 }
 
 // ── IMPORT / EXPORT ──────────────────────────────────────
 function exportJSON() {
-  const blob = new Blob([JSON.stringify({events,_dev:deviceId,_ts:now()},null,2)],{type:'application/json'});
+  const blob = new Blob([JSON.stringify(buildData(),null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`dm-backup-${today()}.json`;
@@ -1065,6 +1374,114 @@ function importJSON() {
   inp.click();
 }
 
+// Guardar datos localmente en IndexedDB
+async function saveLocal() {
+  try {
+    const data = buildData();
+    await dbSet('data', data);
+  } catch(e) {
+    console.error('Error guardando datos locales:', e);
+  }
+}
+
+// Cargar datos desde IndexedDB
+async function loadLocal() {
+  try {
+    const saved = await dbGet('data');
+    if (saved) {
+      loadFromData(saved);
+    }
+  } catch(e) {
+    console.error('Error cargando datos locales:', e);
+  }
+}
+
+//  BORRAR TODOS LOS DATOS
+function confirmDeleteAll() {
+  // Crear un modal especial para el borrado
+  const modal = document.getElementById('modal');
+  const modalT = document.getElementById('modalT');
+  const modalB = document.getElementById('modalB');
+  const modalA = document.getElementById('modalA');
+  
+  modalT.textContent = ' Borrar todos los datos';
+  modalB.innerHTML = `
+    ¿Estás seguro de que quieres borrar TODOS los datos locales?<br><br>
+    Esto eliminará permanentemente:<br>
+    <strong>${events.length} eventos</strong><br>
+    Todos los ingredientes, recetas, ventas, pedidos, etc.<br><br>
+    <strong style="color:var(--danger)">Esta acción no se puede deshacer</strong><br><br>
+    Para continuar, escribe: <code>BORRAR</code><br><br>
+    <input type="text" id="deleteConfirmInput" placeholder="Escribe BORRAR para confirmar" 
+           style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;
+                  background:rgba(34,22,9,.88);color:var(--txt);font-size:1rem;
+                  text-align:center;font-weight:bold;">
+  `;
+  
+  modalA.innerHTML = `
+    <button class="btn" onclick="closeDeleteModal()">Cancelar</button>
+    <button class="btn btn-d" onclick="attemptDelete()">Borrar datos</button>
+  `;
+  
+  modal.classList.remove('hidden');
+  
+  // Focus automático y manejo del input
+  setTimeout(() => {
+    const input = document.getElementById('deleteConfirmInput');
+    if (input) {
+      input.focus();
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          attemptDelete();
+        }
+      };
+    }
+  }, 100);
+}
+
+function closeDeleteModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+function attemptDelete() {
+  const input = document.getElementById('deleteConfirmInput');
+  if (!input) return;
+  
+  if (input.value.trim() === 'BORRAR') {
+    deleteAllData();
+  } else {
+    toast('Debes escribir BORRAR exactamente para confirmar');
+    input.value = '';
+    input.focus();
+  }
+}
+
+async function deleteAllData() {
+  try {
+    setSyncStatus('Borrando todos los datos...', 'syncing');
+    
+    // Borrar eventos locales
+    events = [];
+    state = deriveState(events);
+    await dbSet('events', events);
+    
+    // Limpiar último action ID
+    lastActionId = null;
+    
+    // Actualizar UI
+    renderAll();
+    setSyncStatus('Todos los datos borrados', 'ok');
+    toast(' Todos los datos han sido borrados permanentemente');
+    
+    // Cerrar modal
+    document.getElementById('modal').classList.add('hidden');
+    
+  } catch(e) {
+    setSyncStatus('Error al borrar datos');
+    toast('Error al borrar datos: ' + e.message);
+  }
+}
+
 // ════════════════════════════════════════════════════════
 //  NAVEGACIÓN
 // ════════════════════════════════════════════════════════
@@ -1086,17 +1503,17 @@ function quickCompra(nombre) {
 //  RENDER
 // ════════════════════════════════════════════════════════
 function renderSelects() {
-  const opts='<option value="">— Seleccionar —</option>' +
-    state.recetas.map(r=>`<option value="${r.id}">${r.nombre||'?'} (${stockProducto(r.id)}u)</option>`).join('');
+  const opts='<option value=""> Seleccionar </option>' +
+    recetas.map(r=>`<option value="${r.id}">${r.nombre||'?'} (${stockProducto(r.id)}u)</option>`).join('');
   ['vRec','pRec','prRec','mRec'].forEach(id=>{if($(id))$(id).innerHTML=opts;});
 }
 
 function renderHome() {
   const h     = today();
-  const vHoy  = state.ventas.filter(v=>v.fecha===h&&v.cobrado!==false);
+  const vHoy  = ventas.filter(v=>v.fecha===h&&v.cobrado!==false);
   const inHoy = vHoy.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
-  const pAct  = state.pedidos.filter(p=>p.estado!=='entregado').length;
-  const sLow  = state.ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0)).length;
+  const pAct  = pedidos.filter(p=>p.estado!=='entregado').length;
+  const sLow  = ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0)).length;
   $('kpiHome').innerHTML = `
     <div class="ki" onclick="homeKpi('fin')"><div class="kv">${money(inHoy)}</div><div class="kl">Ingresos hoy</div></div>
     <div class="ki" onclick="homeKpi('ventas')"><div class="kv">${vHoy.length}</div><div class="kl">Ventas hoy</div></div>
@@ -1115,7 +1532,7 @@ function homeKpi(action) {
 function renderLowPanel() {
   const p=$('lowPanel');
   if(!lowOpen){p.classList.add('hidden');return;}
-  const list=state.ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0))
+  const list=ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0))
     .sort((a,b)=>Number(a.stock||0)-Number(b.stock||0)).slice(0,12);
   if(!list.length){
     p.classList.remove('hidden');
@@ -1131,7 +1548,7 @@ function renderLowPanel() {
 }
 
 function renderVentas() {
-  const list=[...state.ventas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  const list=[...ventas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
   $('vList').innerHTML=list.map(v=>{
     const r=recById(v.recetaId);
     return `<div class="li">
@@ -1145,7 +1562,7 @@ function renderVentas() {
 }
 
 function renderPedidos() {
-  const list=state.pedidos.filter(p=>p.estado!=='entregado')
+  const list=pedidos.filter(p=>p.estado!=='entregado')
     .sort((a,b)=>String(a.fechaEntrega||'').localeCompare(String(b.fechaEntrega||'')));
   $('pList').innerHTML=list.map(p=>{
     const tot=(p.items||[]).reduce((a,it)=>a+Number(it.cantidad||0)*Number(it.precio||0),0);
@@ -1160,7 +1577,7 @@ function renderPedidos() {
 }
 
 function renderCompras() {
-  const list=[...state.compras].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  const list=[...historialCompras].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
   $('cList').innerHTML=list.map(c=>{
     const ing=ingById(c.ingId)||{nombre:c.ingNombre||'?',unidad:''};
     return `<div class="li">
@@ -1174,7 +1591,7 @@ function renderCompras() {
 }
 
 function renderProduccion() {
-  const list=[...state.producciones].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  const list=[...producciones].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
   $('prList').innerHTML=list.map(p=>{
     const r=recById(p.recetaId);
     return `<div class="li">
@@ -1185,7 +1602,7 @@ function renderProduccion() {
 }
 
 function renderMermas() {
-  const list=[...state.mermas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  const list=[...mermas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
   $('mList').innerHTML=list.map(m=>{
     const r=recById(m.recetaId);
     return `<div class="li">
@@ -1199,9 +1616,9 @@ function renderMermas() {
 }
 
 function renderFinanzas() {
-  const vt=state.ventas.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
-  const ct=state.compras.reduce((a,c)=>a+Number(c.qty||0)*Number(c.precio||0),0);
-  const et=state.extracciones.reduce((a,e)=>a+Number(e.monto||0),0);
+  const vt=ventas.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
+  const ct=historialCompras.reduce((a,c)=>a+Number(c.qty||0)*Number(c.precio||0),0);
+  const et=extracciones.reduce((a,e)=>a+Number(e.monto||0),0);
   const rt=vt-ct-et;
   $('finKpi').innerHTML=`
     <div class="ki"><div class="kv" style="color:var(--ok)">${money(vt)}</div><div class="kl">Ventas totales</div></div>
@@ -1210,8 +1627,8 @@ function renderFinanzas() {
     <div class="ki"><div class="kv" style="color:${rt>=0?'var(--ok)':'var(--danger)'}">${money(rt)}</div><div class="kl">Resultado</div></div>`;
 
   // Recetas
-  $('recList').innerHTML=state.recetas.length
-    ? state.recetas.map(r=>`
+  $('recList').innerHTML=recetas.length
+    ? recetas.map(r=>`
       <div class="rec-row">
         <span style="font-weight:700">${r.nombre}</span>
         <span style="color:var(--muted);font-size:.78rem">Rinde ${r.rinde||'?'}u · Stock ${stockProducto(r.id)}u</span>
