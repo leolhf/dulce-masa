@@ -74,9 +74,9 @@ function _finMetricas(periodo){
   }
 
   const gastosFijosMes = gastosFijos.reduce((a,g) => {
-    if (g.periodo === 'mensual') return a + g.monto * mesesEnPeriodo;
-    if (g.periodo === 'semanal') return a + g.monto * 4.33 * mesesEnPeriodo;
-    if (g.periodo === 'anual')   return a + (g.monto / 12) * mesesEnPeriodo;
+    if (g.periodo === 'mensual') return a + g.monto;
+    if (g.periodo === 'semanal') return a + g.monto * 4.33;
+    if (g.periodo === 'anual')   return a + g.monto / 12;
     return a;
   }, 0);
 

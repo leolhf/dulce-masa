@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Gastos Fijos</title>
+</head>
+<body>
+    <h1>Test para verificar el cálculo de gastos fijos</h1>
+    <div id="test-results"></div>
+    
+    <script>
+        // Simular los datos del JSON
+        const gastosFijos = [
+            {
+                "id": 1,
+                "nombre": "Gastos de la casa",
+                "monto": 1000,
+                "periodo": "mensual"
+            }
+        ];
+        
+        // Función corregida (como en costos.js)
+        function _gastoFijoMensual(){
+            return (gastosFijos||[]).reduce((a,g)=>{
+                if(g.periodo==='mensual') return a+g.monto;
+                if(g.periodo==='semanal') return a+g.monto*4.33;
+                if(g.periodo==='anual')   return a+g.monto/12;
+                return a;
+            },0);
+        }
+        
+        // Función corregida (como en finanzas-kpi.js después del fix)
+        function _finGastoFijoMensualBase(){
+            return (gastosFijos || []).reduce((a, g) => {
+                if (g.periodo === 'mensual') return a + g.monto;
+                if (g.periodo === 'semanal') return a + g.monto * 4.33;
+                if (g.periodo === 'anual') return a + g.monto / 12;
+                return a;
+            }, 0);
+        }
+        
+        // Test results
+        const resultados = document.getElementById('test-results');
+        const costo = _gastoFijoMensual();
+        const finanzas = _finGastoFijoMensualBase();
+        
+        resultados.innerHTML = `
+            <h2>Resultados:</h2>
+            <p><strong>Pantalla de Costos (Análisis de Costos):</strong> $${costo}.00</p>
+            <p><strong>Pantalla de Finanzas (después del fix):</strong> $${finanzas}.00</p>
+            <p><strong>¿Coinciden?</strong> ${costo === finanzas ? 'SÍ - El problema está solucionado' : 'NO - Hay un error'}</p>
+            <p><strong>Datos originales:</strong> ${JSON.stringify(gastosFijos, null, 2)}</p>
+        `;
+    </script>
+</body>
+</html>
