@@ -3,739 +3,1048 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#C47C2B">
+<meta name="theme-color" content="#0c0804">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="D&M Campo">
-<link rel="manifest" href="movil-manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>Dulce &amp; Masa · Móvil</title>
+<meta name="apple-mobile-web-app-title" content="D&M">
+<title>Dulce &amp; Masa · v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* ─── TOKENS ─── */
 :root{
-  --bg:#0e0a05;--bg2:#140d06;--card:#1a1208;--card2:#231a0e;--line:rgba(196,124,43,.22);
-  --txt:#f2e8d0;--muted:rgba(242,232,208,.65);--car:#c47c2b;--car2:#e8a84a;--ok:#6baf69;--warn:#e8a84a;--danger:#d46c6c;
-  --shadow:0 14px 30px rgba(0,0,0,.28);
+  --bg:#0c0804; --bg2:#120b05; --card:#1a1008; --card2:#221609;
+  --border:rgba(205,158,60,.17); --border2:rgba(205,158,60,.38);
+  --gold:#cd9e3c; --gold2:#ecc060; --gold3:#f5d98a;
+  --txt:#f4ead6; --muted:rgba(244,234,214,.58);
+  --ok:#74c474; --warn:#ecc060; --danger:#de7272;
+  --r:13px; --rSm:9px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 50% -20%, #2b1a0b 0%, var(--bg) 50%, var(--bg2) 100%);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-body{display:flex;flex-direction:column;overflow:hidden}
-.top{padding:12px 14px calc(10px + env(safe-area-inset-top,0px));background:linear-gradient(180deg,rgba(35,26,14,.92),rgba(26,18,8,.92));border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
-.row{display:flex;gap:8px;align-items:center}
-.title{font-weight:900;color:var(--car2);letter-spacing:.01em}
-.sub{font-size:.72rem;color:var(--muted);margin-top:2px}
-.btn{border:1px solid var(--line);background:linear-gradient(180deg,#2a1e11,#20160c);color:var(--txt);border-radius:12px;padding:10px 12px;font-weight:700;transition:all .2s ease;box-shadow:0 4px 12px rgba(0,0,0,.22)}
-.btn:active{transform:scale(.98)}
-.btn:hover{border-color:rgba(232,168,74,.45)}
-.btn.primary{background:linear-gradient(135deg,var(--car2),var(--car));color:#fff;border-color:rgba(255,255,255,.22)}
-.btn.ok{color:var(--ok)}
-.btn.warn{color:var(--warn)}
-.btn.danger{color:var(--danger)}
-.status{margin-top:9px;font-size:.76rem;color:var(--muted);padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(26,18,8,.55)}
-.main{flex:1;overflow:auto;padding:12px 12px calc(82px + env(safe-area-inset-bottom,0px))}
-.card{background:linear-gradient(180deg,rgba(32,22,12,.94),rgba(24,17,9,.96));border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:var(--shadow)}
-.h{font-weight:800;margin-bottom:10px;color:var(--car2);font-size:.95rem;display:flex;align-items:center;gap:6px}
-.grid{display:grid;gap:8px}
-.g2{grid-template-columns:1fr 1fr}
-input,select,textarea{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:rgba(35,26,14,.92);color:var(--txt);outline:none;transition:border-color .2s, box-shadow .2s}
-input:focus,select:focus,textarea:focus{border-color:rgba(232,168,74,.55);box-shadow:0 0 0 3px rgba(232,168,74,.14)}
-label{display:block;font-size:.7rem;color:var(--muted);margin:2px 0 5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+
+/* ─── RESET ─── */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);
+  font-family:'DM Sans',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+
+/* ─── HEADER ─── */
+.hdr{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  padding:12px 15px;
+  padding-top:calc(12px + var(--safe-top));
+  background:linear-gradient(180deg,rgba(26,16,8,.97) 0%,rgba(18,11,5,.93) 100%);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.brand{font-family:'Libre Baskerville',serif;font-size:1.18rem;color:var(--gold2);letter-spacing:.015em}
+.brand-tag{font-size:.62rem;color:var(--muted);font-family:'DM Sans',sans-serif;
+  text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+.hdr-btns{display:flex;gap:6px}
+
+/* ─── SCROLL AREA ─── */
+.main{
+  position:fixed;inset:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-top:calc(72px + var(--safe-top));
+  padding-bottom:calc(78px + var(--safe-bot));
+}
+
+/* ─── BOTTOM NAV ─── */
+.nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  padding:7px 8px;
+  padding-bottom:calc(7px + var(--safe-bot));
+  background:linear-gradient(0deg,rgba(12,8,4,.98) 0%,rgba(18,11,5,.96) 100%);
+  border-top:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  display:grid;grid-template-columns:repeat(7,1fr);gap:3px;
+}
+.nb{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 2px;border:1px solid transparent;border-radius:9px;
+  background:transparent;color:var(--muted);
+  font-size:.56rem;font-weight:700;font-family:'DM Sans',sans-serif;
+  letter-spacing:.03em;cursor:pointer;transition:all .18s;
+}
+.nb .ico{font-size:1.05rem;line-height:1}
+.nb.on{color:var(--gold2);border-color:var(--border2);background:rgba(205,158,60,.1)}
+
+/* ─── SECTIONS ─── */
+.sec{display:none;padding:13px 13px 0;animation:fi .22s ease}
+.sec.on{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── CARD ─── */
+.card{
+  background:linear-gradient(180deg,rgba(34,22,9,.97) 0%,rgba(26,16,8,.99) 100%);
+  border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;margin-bottom:11px;
+}
+.ch{
+  font-family:'Libre Baskerville',serif;font-size:.98rem;
+  color:var(--gold2);margin-bottom:12px;
+  display:flex;align-items:center;gap:7px;
+}
+
+/* ─── KPI ─── */
 .kpi{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.k{background:linear-gradient(180deg,rgba(43,30,17,.85),rgba(35,26,14,.85));border:1px solid var(--line);border-radius:12px;padding:10px}
-.kv{font-size:1.1rem;font-weight:900}
-.kl{font-size:.68rem;color:var(--muted)}
-.k.k-click{cursor:pointer;transition:transform .15s ease,border-color .2s ease,background .2s ease}
-.k.k-click:active{transform:scale(.985)}
-.k.k-click:hover{border-color:rgba(232,168,74,.45)}
-.low-stock-panel{margin-top:9px;padding:10px;border-radius:10px;border:1px solid var(--line);background:rgba(26,18,8,.55)}
-.low-stock-row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid rgba(196,124,43,.15);font-size:.82rem}
-.low-stock-row:last-child{border-bottom:none;padding-bottom:0}
-.low-stock-row.k-click{cursor:pointer;transition:opacity .15s ease}
-.low-stock-row.k-click:active{opacity:.75}
-.low-stock-name{font-weight:700}
-.low-stock-val{color:var(--warn);font-weight:700}
-.list .i{background:linear-gradient(180deg,rgba(42,30,17,.75),rgba(33,23,13,.75));border:1px solid var(--line);border-radius:11px;padding:10px;margin-bottom:8px}
-.tabs{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,rgba(29,20,11,.96),rgba(23,16,9,.96));border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(7,1fr);gap:6px;backdrop-filter:blur(6px)}
-.tab{border:1px solid var(--line);background:rgba(35,26,14,.8);color:var(--muted);border-radius:10px;padding:7px 2px;font-size:.62rem;text-align:center;font-weight:700}
-.tab.active{color:#fff;border-color:var(--car2);background:linear-gradient(180deg,rgba(232,168,74,.3),rgba(196,124,43,.18))}
+.ki{
+  background:linear-gradient(180deg,rgba(44,28,12,.82) 0%,rgba(34,22,9,.82) 100%);
+  border:1px solid var(--border);border-radius:11px;
+  padding:11px 12px;cursor:pointer;transition:border-color .2s,transform .14s;
+}
+.ki:active{transform:scale(.97)}
+.ki:hover{border-color:var(--border2)}
+.kv{font-size:1.12rem;font-weight:700;color:var(--gold2)}
+.kl{font-size:.63rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+
+/* ─── FORMS ─── */
+.fg{margin-bottom:9px}
+label{display:block;font-size:.66rem;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+input,select,textarea{
+  width:100%;padding:10px 12px;
+  background:rgba(34,22,9,.88);border:1px solid var(--border);
+  border-radius:9px;color:var(--txt);
+  font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus,textarea:focus{
+  border-color:rgba(205,158,60,.48);
+  box-shadow:0 0 0 3px rgba(205,158,60,.09);
+}
+select option{background:#1a1008}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+/* ─── BUTTONS ─── */
+.btn{
+  padding:10px 14px;border:1px solid var(--border);border-radius:10px;
+  background:linear-gradient(180deg,rgba(44,28,12,.92) 0%,rgba(34,22,9,.92) 100%);
+  color:var(--txt);font-family:'DM Sans',sans-serif;
+  font-weight:700;font-size:.83rem;cursor:pointer;
+  transition:all .17s;width:100%;
+}
+.btn:active{transform:scale(.98)}
+.btn:hover{border-color:var(--border2)}
+.btn-p{background:linear-gradient(135deg,var(--gold3) 0%,var(--gold) 100%);
+  color:#15090200;color:#1a0800;border-color:transparent}
+.btn-p:hover{filter:brightness(1.06)}
+.btn-ok{color:var(--ok);border-color:rgba(116,196,116,.2)}
+.btn-w{color:var(--warn);border-color:rgba(236,192,96,.2)}
+.btn-d{color:var(--danger);border-color:rgba(222,114,114,.2)}
+.btn-sm{padding:7px 11px;font-size:.76rem;width:auto;border-radius:8px}
+
+/* ─── LIST ITEMS ─── */
+.li{
+  background:linear-gradient(180deg,rgba(40,26,11,.75) 0%,rgba(32,20,8,.75) 100%);
+  border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;margin-bottom:7px;
+}
+.li-t{font-weight:700;font-size:.88rem}
+.li-s{font-size:.74rem;color:var(--muted);margin-top:3px}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;
+  border-radius:100px;font-size:.62rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em}
+.b-ok{background:rgba(116,196,116,.14);color:var(--ok)}
+.b-w{background:rgba(236,192,96,.14);color:var(--warn)}
+.b-d{background:rgba(222,114,114,.14);color:var(--danger)}
+
+/* ─── SYNC BAR ─── */
+.syncbar{
+  font-size:.71rem;color:var(--muted);
+  background:rgba(34,22,9,.7);border:1px solid var(--border);
+  border-radius:8px;padding:7px 10px;margin-top:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.ok{background:var(--ok)} .dot.syncing{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─── STOCK ROWS ─── */
+.srow{display:flex;justify-content:space-between;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--border);
+  font-size:.8rem;cursor:pointer;transition:opacity .15s}
+.srow:last-child{border-bottom:none;padding-bottom:0}
+.srow:active{opacity:.7}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;z-index:999;
+  bottom:calc(88px + var(--safe-bot));
+  left:50%;transform:translateX(-50%) translateY(12px);
+  background:rgba(34,22,9,.97);border:1px solid var(--border2);
+  border-radius:100px;padding:9px 18px;
+  font-size:.81rem;font-weight:600;color:var(--txt);
+  backdrop-filter:blur(10px);opacity:0;
+  transition:all .24s ease;pointer-events:none;
+  white-space:nowrap;max-width:90%;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── MODAL ─── */
+.overlay{
+  position:fixed;inset:0;z-index:800;
+  background:rgba(8,5,2,.88);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  background:linear-gradient(180deg,rgba(34,22,9,.99) 0%,rgba(26,16,8,.99) 100%);
+  border:1px solid var(--border2);border-radius:17px;
+  padding:22px;max-width:340px;width:100%;
+}
+.modal-t{font-family:'Libre Baskerville',serif;font-size:1.12rem;
+  color:var(--gold2);margin-bottom:9px}
+.modal-b{font-size:.83rem;color:var(--muted);line-height:1.6;margin-bottom:17px}
+.modal-a{display:flex;flex-direction:column;gap:7px}
 .hidden{display:none!important}
+
+/* ─── SECTION TITLE ─── */
+.sec-lbl{font-size:.65rem;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;
+  padding-left:2px;border-left:2px solid var(--gold);padding-left:8px}
+
+/* ─── RECETA ADD ─── */
+.rec-row{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid var(--border);font-size:.84rem}
+.rec-row:last-child{border-bottom:none;padding-bottom:0}
 </style>
 </head>
 <body>
-  <div class="top">
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <div class="title">Dulce &amp; Masa · Campo</div>
-        <div class="sub">Compatible con datos de PC</div>
-      </div>
-      <div class="row">
-        <button class="btn" id="btnSync">⟳ Sync</button>
-        <button class="btn primary" id="btnUpload">☁ Subir</button>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div>
+    <div class="brand">Dulce &amp; Masa</div>
+    <div class="brand-tag">Sync v2 · Sin conflictos</div>
+  </div>
+  <div class="hdr-btns">
+    <button class="btn btn-sm" id="btnSync">⟳ Sync</button>
+    <button class="btn btn-sm btn-p" id="btnUpload">☁ Subir</button>
+  </div>
+</header>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+
+  <!-- HOME -->
+  <section class="sec on" id="s-home">
+    <div class="card">
+      <div class="ch">✨ Hoy</div>
+      <div class="kpi" id="kpiHome"></div>
+      <div id="lowPanel" class="hidden" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div class="ch">⚡ Acceso rápido</div>
+      <div class="g2" style="gap:8px">
+        <button class="btn" onclick="go('ventas')">💸 Venta</button>
+        <button class="btn" onclick="go('pedidos')">📋 Pedido</button>
+        <button class="btn" onclick="go('compras')">🛒 Compra</button>
+        <button class="btn" onclick="go('prod')">🏭 Producción</button>
       </div>
     </div>
-    <div class="status" id="syncStatus">Sincronización no iniciada</div>
+    <div class="card">
+      <div class="ch">🗄 Herramientas</div>
+      <div class="g2" style="gap:8px">
+        <button class="btn btn-ok" onclick="exportJSON()">↓ Exportar</button>
+        <button class="btn btn-w" onclick="importJSON()">↑ Importar</button>
+        <button class="btn" onclick="configDrive()">⚙ Drive URL</button>
+        <button class="btn btn-d" onclick="undoLast()">↩ Deshacer</button>
+      </div>
+    </div>
+    <div class="syncbar" id="syncBar"><span class="dot" id="syncDot"></span><span id="syncTxt">Iniciando…</span></div>
+  </section>
+
+  <!-- VENTAS -->
+  <section class="sec" id="s-ventas">
+    <div class="sec-lbl">Registrar venta</div>
+    <div class="card">
+      <div class="fg"><label>Producto</label><select id="vRec"></select></div>
+      <div class="g2">
+        <div class="fg"><label>Unidades</label><input id="vUni" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="fg"><label>Precio / u</label><input id="vPre" type="number" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <div class="fg"><label>Canal</label>
+        <select id="vCan"><option>directo</option><option>encargo</option><option>delivery</option><option>evento</option><option>otro</option></select>
+      </div>
+      <div class="fg"><label>Nota</label><input id="vNota" placeholder="Opcional"></div>
+      <button class="btn btn-p" onclick="addVenta()">Guardar venta</button>
+    </div>
+    <div class="card"><div class="ch">🧾 Recientes</div><div id="vList"></div></div>
+  </section>
+
+  <!-- PEDIDOS -->
+  <section class="sec" id="s-pedidos">
+    <div class="sec-lbl">Nuevo pedido</div>
+    <div class="card">
+      <div class="fg"><label>Cliente</label><input id="pCli" placeholder="Nombre del cliente"></div>
+      <div class="g2">
+        <div class="fg"><label>Entrega</label><input id="pFec" type="date"></div>
+        <div class="fg"><label>Anticipo</label><input id="pAnt" type="number" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <div class="fg"><label>Producto</label><select id="pRec"></select></div>
+      <div class="g2">
+        <div class="fg"><label>Cantidad</label><input id="pCan" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="fg"><label>Precio / u</label><input id="pPre" type="number" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <button class="btn btn-p" onclick="addPedido()">Guardar pedido</button>
+    </div>
+    <div class="card"><div class="ch">📌 Activos</div><div id="pList"></div></div>
+  </section>
+
+  <!-- COMPRAS -->
+  <section class="sec" id="s-compras">
+    <div class="sec-lbl">Registrar compra</div>
+    <div class="card">
+      <div class="fg"><label>Ingrediente</label><input id="cIng" placeholder="Nombre del ingrediente" autocomplete="off"></div>
+      <div class="g2">
+        <div class="fg"><label>Cantidad</label><input id="cQty" type="number" step="0.001" min="0" inputmode="decimal"></div>
+        <div class="fg"><label>Precio / u</label><input id="cPre" type="number" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <div class="fg"><label>Proveedor</label><input id="cPro" placeholder="Opcional" autocomplete="off"></div>
+      <button class="btn btn-p" onclick="addCompra()">Guardar compra</button>
+    </div>
+    <div class="card"><div class="ch">🧾 Recientes</div><div id="cList"></div></div>
+  </section>
+
+  <!-- PRODUCCIÓN -->
+  <section class="sec" id="s-prod">
+    <div class="sec-lbl">Registrar producción</div>
+    <div class="card">
+      <div class="fg"><label>Receta</label><select id="prRec"></select></div>
+      <div class="g2">
+        <div class="fg"><label>Tandas</label><input id="prTan" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="fg"><label>Unidades reales</label><input id="prReal" type="number" min="0" placeholder="Auto" inputmode="numeric"></div>
+      </div>
+      <button class="btn btn-p" onclick="addProduccion()">Guardar producción</button>
+    </div>
+    <div class="card"><div class="ch">📦 Recientes</div><div id="prList"></div></div>
+  </section>
+
+  <!-- MERMAS -->
+  <section class="sec" id="s-mermas">
+    <div class="sec-lbl">Registrar merma</div>
+    <div class="card">
+      <div class="fg"><label>Receta</label><select id="mRec"></select></div>
+      <div class="g2">
+        <div class="fg"><label>Cantidad</label><input id="mCan" type="number" min="1" value="1" inputmode="numeric"></div>
+        <div class="fg"><label>Motivo</label>
+          <select id="mMot"><option value="">— Seleccionar —</option>
+            <option>Daño</option><option>Vencido</option><option>Quemado</option>
+            <option>Mal almacenamiento</option><option>Otro</option></select>
+        </div>
+      </div>
+      <button class="btn btn-p" onclick="addMerma()">Guardar merma</button>
+    </div>
+    <div class="card"><div class="ch">🧾 Recientes</div><div id="mList"></div></div>
+  </section>
+
+  <!-- FINANZAS -->
+  <section class="sec" id="s-fin">
+    <div class="sec-lbl">Resumen financiero</div>
+    <div class="card"><div class="ch">💼 KPIs</div><div class="kpi" id="finKpi"></div></div>
+    <div class="card">
+      <div class="ch">💵 Extracción rápida</div>
+      <div class="g2" style="align-items:flex-end">
+        <div class="fg" style="margin-bottom:0"><label>Monto</label><input id="fMon" type="number" step="0.01" min="0" inputmode="decimal" placeholder="$0.00"></div>
+        <button class="btn btn-p" onclick="addExtraccion()">Registrar</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch">🗃 Recetas</div>
+      <div class="g2" style="margin-bottom:12px">
+        <div class="fg" style="margin-bottom:0"><label>Nombre</label><input id="rNom" placeholder="Ej: Alfajor" autocomplete="off"></div>
+        <div class="fg" style="margin-bottom:0"><label>Rinde (u)</label><input id="rRin" type="number" min="1" value="12" inputmode="numeric"></div>
+      </div>
+      <button class="btn" onclick="addReceta()" style="margin-bottom:12px">+ Agregar receta</button>
+      <div id="recList"></div>
+    </div>
+  </section>
+
+</div><!-- /main -->
+
+<!-- ═══ BOTTOM NAV ═══ -->
+<nav class="nav">
+  <button class="nb on" id="t-home" onclick="go('home')"><span class="ico">🏠</span>Inicio</button>
+  <button class="nb" id="t-ventas" onclick="go('ventas')"><span class="ico">💸</span>Ventas</button>
+  <button class="nb" id="t-pedidos" onclick="go('pedidos')"><span class="ico">📋</span>Pedidos</button>
+  <button class="nb" id="t-compras" onclick="go('compras')"><span class="ico">🛒</span>Compras</button>
+  <button class="nb" id="t-prod" onclick="go('prod')"><span class="ico">🏭</span>Prod.</button>
+  <button class="nb" id="t-mermas" onclick="go('mermas')"><span class="ico">📉</span>Mermas</button>
+  <button class="nb" id="t-fin" onclick="go('fin')"><span class="ico">💼</span>Finanzas</button>
+</nav>
+
+<!-- ═══ TOAST ═══ -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══ MODAL ═══ -->
+<div class="overlay hidden" id="modal">
+  <div class="modal">
+    <div class="modal-t" id="modalT"></div>
+    <div class="modal-b" id="modalB"></div>
+    <div class="modal-a" id="modalA"></div>
   </div>
-
-  <div class="main" id="main">
-    <section id="s-home">
-      <div class="card">
-        <div class="h">✨ Resumen</div>
-        <div class="kpi" id="kpis"></div>
-        <div class="low-stock-panel hidden" id="lowStockPanel"></div>
-      </div>
-      <div class="card">
-        <div class="h">⚡ Acciones rápidas</div>
-        <div class="grid g2">
-          <button class="btn" onclick="go('ventas')">Registrar venta</button>
-          <button class="btn" onclick="go('pedidos')">Nuevo pedido</button>
-          <button class="btn" onclick="go('compras')">Registrar compra</button>
-          <button class="btn" onclick="go('produccion')">Registrar producción</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="h">🧰 Herramientas</div>
-        <div class="grid g2">
-          <button class="btn ok" onclick="backupLocal()">Exportar JSON</button>
-          <button class="btn warn" onclick="importLocal()">Importar JSON</button>
-          <button class="btn" onclick="configDrive()">Configurar Drive</button>
-          <button class="btn danger" onclick="undoLast()">Deshacer última</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="s-ventas" class="hidden">
-      <div class="card">
-        <div class="h">💸 Registrar venta</div>
-        <div class="grid">
-          <div><label>Producto</label><select id="vRec"></select></div>
-          <div class="grid g2">
-            <div><label>Unidades</label><input id="vUni" type="number" min="1" value="1"></div>
-            <div><label>Precio/u</label><input id="vPre" type="number" min="0" step="0.01"></div>
-          </div>
-          <div><label>Canal</label><select id="vCan"><option>directo</option><option>encargo</option><option>delivery</option><option>evento</option><option>otro</option></select></div>
-          <div><label>Nota</label><input id="vNota"></div>
-          <button class="btn primary" onclick="addVenta()">Guardar venta</button>
-        </div>
-      </div>
-      <div class="card"><div class="h">🧾 Ventas recientes</div><div class="list" id="vList"></div></div>
-    </section>
-
-    <section id="s-pedidos" class="hidden">
-      <div class="card">
-        <div class="h">📋 Nuevo pedido</div>
-        <div class="grid">
-          <div><label>Cliente</label><input id="pCli"></div>
-          <div class="grid g2">
-            <div><label>Entrega</label><input id="pFec" type="date"></div>
-            <div><label>Anticipo</label><input id="pAnt" type="number" step="0.01"></div>
-          </div>
-          <div><label>Producto</label><select id="pRec"></select></div>
-          <div class="grid g2">
-            <div><label>Cantidad</label><input id="pCan" type="number" min="1" value="1"></div>
-            <div><label>Precio/u</label><input id="pPre" type="number" step="0.01"></div>
-          </div>
-          <button class="btn primary" onclick="addPedido()">Guardar pedido</button>
-        </div>
-      </div>
-      <div class="card"><div class="h">📌 Pedidos activos</div><div class="list" id="pList"></div></div>
-    </section>
-
-    <section id="s-compras" class="hidden">
-      <div class="card">
-        <div class="h">🛒 Registrar compra</div>
-        <div class="grid">
-          <div><label>Ingrediente</label><input id="cIng" placeholder="Escribe nombre"></div>
-          <div class="grid g2">
-            <div><label>Cantidad</label><input id="cQty" type="number" step="0.001"></div>
-            <div><label>Precio/u</label><input id="cPre" type="number" step="0.01"></div>
-          </div>
-          <div><label>Proveedor (opcional)</label><input id="cPro"></div>
-          <button class="btn primary" onclick="addCompra()">Guardar compra</button>
-        </div>
-      </div>
-      <div class="card"><div class="h">🧾 Compras recientes</div><div class="list" id="cList"></div></div>
-    </section>
-
-    <section id="s-produccion" class="hidden">
-      <div class="card">
-        <div class="h">🏭 Registrar producción</div>
-        <div class="grid">
-          <div><label>Receta</label><select id="prRec"></select></div>
-          <div class="grid g2">
-            <div><label>Tandas</label><input id="prTan" type="number" min="1" value="1"></div>
-            <div><label>Unidades reales (opcional)</label><input id="prReal" type="number" min="0"></div>
-          </div>
-          <button class="btn primary" onclick="addProduccion()">Guardar producción</button>
-        </div>
-      </div>
-      <div class="card"><div class="h">📦 Producciones recientes</div><div class="list" id="prList"></div></div>
-    </section>
-
-    <section id="s-mermas" class="hidden">
-      <div class="card">
-        <div class="h">📉 Registrar merma</div>
-        <div class="grid">
-          <div><label>Receta</label><select id="mRec"></select></div>
-          <div class="grid g2">
-            <div><label>Cantidad</label><input id="mCan" type="number" min="1" value="1"></div>
-            <div><label>Motivo</label><select id="mMot"><option value="">Seleccionar...</option><option>Daño</option><option>Vencido</option><option>Quemado</option><option>Mal almacenamiento</option><option>Otro</option></select></div>
-          </div>
-          <button class="btn primary" onclick="addMerma()">Guardar merma</button>
-        </div>
-      </div>
-      <div class="card"><div class="h">🧾 Mermas recientes</div><div class="list" id="mList"></div></div>
-    </section>
-
-    <section id="s-finanzas" class="hidden">
-      <div class="card">
-        <div class="h">💼 Resumen financiero rápido</div>
-        <div class="kpi" id="finKpi"></div>
-      </div>
-      <div class="card">
-        <div class="h">💵 Extracción rápida</div>
-        <div class="grid g2">
-          <input id="fMon" type="number" step="0.01" placeholder="Monto">
-          <button class="btn primary" onclick="addExtraccion()">Registrar</button>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <div class="tabs">
-    <button class="tab active" id="t-home" onclick="go('home')">🏠 Inicio</button>
-    <button class="tab" id="t-ventas" onclick="go('ventas')">💸 Ventas</button>
-    <button class="tab" id="t-pedidos" onclick="go('pedidos')">📋 Pedidos</button>
-    <button class="tab" id="t-compras" onclick="go('compras')">🛒 Compras</button>
-    <button class="tab" id="t-produccion" onclick="go('produccion')">🏭 Producción</button>
-    <button class="tab" id="t-mermas" onclick="go('mermas')">📉 Mermas</button>
-    <button class="tab" id="t-finanzas" onclick="go('finanzas')">💼 Finanzas</button>
-  </div>
+</div>
 
 <script>
-const TZ = 'America/Havana';
-const DATA_KEYS = ['ingredientes','recetas','producciones','ventas','pedidos','stockProductos','proveedores','historialCompras','lotesIngredientes','catRecetas','gastosFijos','extracciones','prestamos','metas','capital_ajustes','mermas'];
-const NEXT_KEYS = ['ing','rec','prod','venta','comp','prov','pedido','ext','prestamo','lote','merma'];
-const NEXTID_MAP = {ingredientes:'ing',recetas:'rec',producciones:'prod',ventas:'venta',historialCompras:'comp',proveedores:'prov',pedidos:'pedido',extracciones:'ext',prestamos:'prestamo',lotesIngredientes:'lote',mermas:'merma'};
-let data = null;
-let lastSync = null;
-let gasUrl = localStorage.getItem('gas_url') || '';
-let history = [];
-let lowStockOpen = false;
+'use strict';
+/* ════════════════════════════════════════════════════════
+   DULCE & MASA · Móvil v2
+   Arquitectura: Event Sourcing
+   ────────────────────────────────────────────────────────
+   CÓMO FUNCIONA EL SYNC SIN CONFLICTOS:
+   • Cada acción genera un EVENTO con UUID único + timestamp.
+   • Los eventos son inmutables y nunca se editan.
+   • Al sincronizar: union(eventosLocales ∪ eventosDrive) por UUID.
+   • Si el mismo evento existe en ambos, se usa una sola vez.
+   • No hay "último gana" ni prompts de resolución manual.
+   • El estado se DERIVA repasando todos los eventos ordenados.
+   ════════════════════════════════════════════════════════ */
 
-const $ = id => document.getElementById(id);
-const money = n => '$' + Number(n || 0).toFixed(2);
+// ── CONSTANTES ──────────────────────────────────────────
+const SECTIONS = ['home','ventas','pedidos','compras','prod','mermas','fin'];
+const DB_NAME   = 'dm-v2';
+const TZ        = 'America/Argentina/Buenos_Aires';
 
-// Corrector ortografico global (fase 1): texto libre con exclusiones seguras.
-(function () {
-  const TEXT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel']);
-  const SKIP_IDS = new Set(['stock-q']);
-
-  function shouldEnable(el) {
-    if (!el || el.disabled || el.readOnly) return false;
-    if (el.dataset.noSpellcheck === 'true') return false;
-    if (el.id && SKIP_IDS.has(el.id)) return false;
-    if (el.tagName === 'TEXTAREA') return true;
-    if (el.tagName !== 'INPUT') return false;
-    const type = (el.type || 'text').toLowerCase();
-    return TEXT_TYPES.has(type);
-  }
-
-  function applySpellcheck(root) {
-    const scope = root && root.querySelectorAll ? root : document;
-    const fields = scope.querySelectorAll('input, textarea');
-    fields.forEach((el) => {
-      if (!shouldEnable(el)) return;
-      el.spellcheck = true;
-      el.setAttribute('lang', 'es');
-      if (!el.hasAttribute('autocapitalize')) el.setAttribute('autocapitalize', 'sentences');
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => applySpellcheck(document));
-  } else {
-    applySpellcheck(document);
-  }
-
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((m) => {
-      m.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) applySpellcheck(node);
-      });
-    });
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+// ── ESTADO GLOBAL ────────────────────────────────────────
+let events   = [];   // Registro de eventos (fuente de verdad)
+let state    = {};   // Estado derivado (cache)
+let gasUrl   = localStorage.getItem('dm2_gas') || '';
+let deviceId = localStorage.getItem('dm2_dev') || (() => {
+  const d = uuidv4(); localStorage.setItem('dm2_dev', d); return d;
 })();
+let lastActionId = null;  // Para "deshacer"
+let lowOpen      = false;
 
-function toast(msg){ $('syncStatus').textContent = msg; }
-function today(){ return new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
-function nowISOLocal(){
-  const now = new Date();
-  const tzStr = now.toLocaleString('en-US',{timeZone:TZ});
-  const tzDate = new Date(tzStr);
-  const offsetMs = now - tzDate;
-  const offsetMin = -Math.round(offsetMs/60000);
-  const sign = offsetMin >= 0 ? '+' : '-';
-  const hh = String(Math.floor(Math.abs(offsetMin)/60)).padStart(2,'0');
-  const mm = String(Math.abs(offsetMin)%60).padStart(2,'0');
-  const local = new Date(now.getTime() - offsetMs);
-  return local.toISOString().replace('Z', `${sign}${hh}:${mm}`);
-}
-
-function normalize(inData){
-  const d = JSON.parse(JSON.stringify(inData || {}));
-  DATA_KEYS.forEach(k => { if(!Array.isArray(d[k])) d[k] = []; });
-  if(!d.nextId) d.nextId = {};
-  NEXT_KEYS.forEach(k => { d.nextId[k] = Math.max(1, Number(d.nextId[k] || 1)); });
-  Object.entries(NEXTID_MAP).forEach(([col, key]) => {
-    const maxId = (d[col] || []).reduce((m, x) => Math.max(m, Number(x?.id || 0)), 0);
-    d.nextId[key] = Math.max(d.nextId[key] || 1, maxId + 1);
-  });
-  d._version = 2;
-  return d;
-}
-
-function buildPayload(){
-  const d = normalize(data);
-  d._guardado = nowISOLocal();
-  return d;
-}
-
-function recById(id){ return (data.recetas || []).find(r => Number(r.id) === Number(id)); }
-function ingByName(name){ return (data.ingredientes || []).find(i => (i.nombre || '').toLowerCase() === name.toLowerCase()); }
-function provByName(name){ return (data.proveedores || []).find(p => (p.nombre || '').toLowerCase() === name.toLowerCase()); }
-function nextId(col){
-  const key = NEXTID_MAP[col];
-  if(!key) return Date.now();
-  const id = Number(data.nextId[key] || 1);
-  data.nextId[key] = id + 1;
-  return id;
-}
-
-function stockProducto(recetaId){
-  const prod = (data.producciones||[]).filter(p => Number(p.recetaId)===Number(recetaId)).reduce((a,p) => {
-    const r = recById(p.recetaId);
-    return a + Number(p.unidadesReales || ((r?.rinde || 0) * (p.tandas || 0)));
-  }, 0);
-  const vend = (data.ventas||[]).filter(v => Number(v.recetaId)===Number(recetaId)).reduce((a,v)=>a+Number(v.unidades||0),0);
-  const merm = (data.mermas||[]).filter(m => Number(m.recetaId)===Number(recetaId)).reduce((a,m)=>a+Number(m.cantidad||0),0);
-  const listo = (data.pedidos||[]).filter(p=>p.estado==='listo').reduce((a,p)=>a+(p.items||[]).filter(it=>Number(it.recetaId)===Number(recetaId)).reduce((b,it)=>b+Number(it.cantidad||0),0),0);
-  return Math.max(0, prod - vend - merm - listo);
-}
-
-async function openDb(){
-  return await new Promise((res, rej) => {
-    const req = indexedDB.open('dulce_masa_mobile_v2', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('store');
-    req.onsuccess = e => res(e.target.result);
-    req.onerror = e => rej(e.target.error);
+// ── UUID ─────────────────────────────────────────────────
+function uuidv4() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
-async function dbGet(db,key){ return await new Promise((res,rej)=>{ const tx=db.transaction('store','readonly'); const r=tx.objectStore('store').get(key); r.onsuccess=e=>res(e.target.result); r.onerror=e=>rej(e.target.error); }); }
-async function dbSet(db,key,val){ return await new Promise((res,rej)=>{ const tx=db.transaction('store','readwrite'); tx.objectStore('store').put(val,key); tx.oncomplete=()=>res(); tx.onerror=e=>rej(e.target.error); }); }
 
-async function saveLocal(){
-  const db = await openDb();
-  await dbSet(db, 'data', data);
-  await dbSet(db, 'lastSync', lastSync);
+// ── FECHAS / FORMATO ─────────────────────────────────────
+const now   = () => new Date().toLocaleString('sv',{timeZone:TZ}).replace(' ','T');
+const today = () => new Date().toLocaleDateString('sv',{timeZone:TZ});
+const $     = id  => document.getElementById(id);
+const money = n   => '$' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
+
+// ── TOAST ────────────────────────────────────────────────
+let _tt;
+function toast(msg, ms=2800) {
+  const el=$('toast'); el.textContent=msg; el.classList.add('on');
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),ms);
 }
 
-async function loadLocal(){
-  const db = await openDb();
-  data = normalize(await dbGet(db, 'data'));
-  lastSync = await dbGet(db, 'lastSync') || null;
-}
-
-function go(s){
-  ['home','ventas','pedidos','compras','produccion','mermas','finanzas'].forEach(k=>{
-    $('s-'+k).classList.toggle('hidden', k!==s);
-    $('t-'+k).classList.toggle('active', k===s);
+// ── INDEXEDDB ────────────────────────────────────────────
+function openDB() {
+  return new Promise((ok,fail)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+    };
+    r.onsuccess=e=>ok(e.target.result);
+    r.onerror=e=>fail(e.target.error);
   });
-  renderAll();
+}
+async function dbGet(key) {
+  const db=await openDB();
+  return new Promise((ok,fail)=>{
+    const r=db.transaction('kv','readonly').objectStore('kv').get(key);
+    r.onsuccess=()=>ok(r.result); r.onerror=()=>fail(r.error);
+  });
+}
+async function dbSet(key,val) {
+  const db=await openDB();
+  return new Promise((ok,fail)=>{
+    const r=db.transaction('kv','readwrite').objectStore('kv').put(val,key);
+    r.onsuccess=ok; r.onerror=()=>fail(r.error);
+  });
 }
 
-function pushHistory(type, payload){ history.unshift({type, payload}); history = history.slice(0, 30); }
+// ════════════════════════════════════════════════════════
+//  EVENT SOURCING  —  núcleo del sistema
+// ════════════════════════════════════════════════════════
 
-function renderSelectRecetas(){
-  const opts = `<option value="">Seleccionar...</option>` + (data.recetas||[]).map(r=>`<option value="${r.id}">${(r.nombre||'Receta')} (${stockProducto(r.id)}u)</option>`).join('');
-  ['vRec','pRec','prRec','mRec'].forEach(id => { if($(id)) $(id).innerHTML = opts; });
-}
+/**
+ * deriveState(events) → Recorre todos los eventos ordenados por timestamp
+ * y reconstruye el estado completo. Esto es la base del sync sin conflictos.
+ */
+function deriveState(evts) {
+  const s = {
+    ingredientes:{}, recetas:{}, ventas:{}, pedidos:{},
+    compras:{}, producciones:{}, mermas:{}, extracciones:{}, proveedores:{}
+  };
 
-function renderHome(){
-  const h = today();
-  const ventasHoy = (data.ventas||[]).filter(v=>v.fecha===h && v.cobrado!==false);
-  const ingresosHoy = ventasHoy.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
-  const pedidosAct = (data.pedidos||[]).filter(p=>p.estado!=='entregado').length;
-  const stockBajo = (data.ingredientes||[]).filter(i=>Number(i.stock||0) <= Number(i.min||0)).length;
-  $('kpis').innerHTML = `
-    <div class="k k-click" onclick="homeKpiAction('finanzas')"><div class="kv">${money(ingresosHoy)}</div><div class="kl">Ingresos hoy</div></div>
-    <div class="k k-click" onclick="homeKpiAction('ventas')"><div class="kv">${ventasHoy.length}</div><div class="kl">Ventas hoy</div></div>
-    <div class="k k-click" onclick="homeKpiAction('pedidos')"><div class="kv">${pedidosAct}</div><div class="kl">Pedidos activos</div></div>
-    <div class="k k-click" onclick="homeKpiAction('stock-bajo')"><div class="kv">${stockBajo}</div><div class="kl">Ingredientes bajo mínimo</div></div>`;
-  renderLowStockPanel();
-}
+  const sorted = [...evts].sort((a,b)=>a.ts.localeCompare(b.ts));
 
-function homeKpiAction(action){
-  if(action === 'stock-bajo'){
-    lowStockOpen = !lowStockOpen;
-    renderLowStockPanel();
-    return;
+  for (const ev of sorted) {
+    const p = ev.payload;
+    switch(ev.type) {
+
+      // ── Recetas
+      case 'add_receta':
+        s.recetas[p.id] = {...p}; break;
+      case 'del_receta':
+        delete s.recetas[p.id]; break;
+
+      // ── Ingredientes
+      case 'add_ingrediente':
+        if (!s.ingredientes[p.id])
+          s.ingredientes[p.id] = {...p, stock:Number(p.stock||0)};
+        break;
+      case 'adj_stock':
+        if (s.ingredientes[p.id])
+          s.ingredientes[p.id].stock = Math.max(0, Number(s.ingredientes[p.id].stock||0)+Number(p.delta||0));
+        break;
+
+      // ── Ventas
+      case 'add_venta':
+        s.ventas[p.id] = {...p}; break;
+      case 'undo_venta':
+        delete s.ventas[p.id]; break;
+
+      // ── Pedidos
+      case 'add_pedido':
+        s.pedidos[p.id] = {...p}; break;
+      case 'upd_pedido':
+        if(s.pedidos[p.id]) s.pedidos[p.id]={...s.pedidos[p.id],...p}; break;
+      case 'undo_pedido':
+        delete s.pedidos[p.id]; break;
+
+      // ── Compras
+      case 'add_compra': {
+        s.compras[p.id] = {...p};
+        const ing = s.ingredientes[p.ingId];
+        if (ing) {
+          ing.stock = Number(ing.stock||0)+Number(p.qty||0);
+          if (p.precio>0) ing.precio = p.precio;
+        } else if (p.ingId) {
+          s.ingredientes[p.ingId] = {
+            id:p.ingId, nombre:p.ingNombre||'?',
+            unidad:p.ingUnidad||'kg', stock:Number(p.qty||0),
+            min:0, precio:p.precio||0
+          };
+        }
+        break;
+      }
+      case 'undo_compra': {
+        const c=s.compras[p.id];
+        if(c && s.ingredientes[c.ingId])
+          s.ingredientes[c.ingId].stock = Math.max(0,
+            Number(s.ingredientes[c.ingId].stock||0)-Number(c.qty||0));
+        delete s.compras[p.id]; break;
+      }
+
+      // ── Producción
+      case 'add_produccion':
+        s.producciones[p.id]={...p}; break;
+      case 'undo_produccion':
+        delete s.producciones[p.id]; break;
+
+      // ── Mermas
+      case 'add_merma':
+        s.mermas[p.id]={...p}; break;
+      case 'undo_merma':
+        delete s.mermas[p.id]; break;
+
+      // ── Extracciones
+      case 'add_extraccion':
+        s.extracciones[p.id]={...p}; break;
+      case 'undo_extraccion':
+        delete s.extracciones[p.id]; break;
+
+      // ── Proveedores
+      case 'add_proveedor':
+        if(!s.proveedores[p.id]) s.proveedores[p.id]={...p}; break;
+    }
   }
+
+  return {
+    ingredientes: Object.values(s.ingredientes),
+    recetas:      Object.values(s.recetas),
+    ventas:       Object.values(s.ventas),
+    pedidos:      Object.values(s.pedidos),
+    compras:      Object.values(s.compras),
+    producciones: Object.values(s.producciones),
+    mermas:       Object.values(s.mermas),
+    extracciones: Object.values(s.extracciones),
+    proveedores:  Object.values(s.proveedores)
+  };
+}
+
+/**
+ * dispatch(type, payload) → Crea un evento, lo persiste y actualiza estado.
+ */
+async function dispatch(type, payload) {
+  const ev = {id:uuidv4(), type, payload:{...payload}, ts:now(), device:deviceId};
+  events.push(ev);
+  state = deriveState(events);
+  await dbSet('events', events);
+  renderAll();
+  return ev;
+}
+
+/**
+ * mergeEvents(a, b) → Une dos logs de eventos por UUID.
+ * Matemáticamente es una UNIÓN de conjuntos → nunca hay conflictos.
+ * Si el mismo evento aparece en ambos lados, se incluye solo una vez.
+ */
+function mergeEvents(local, remote) {
+  const map = {};
+  for (const ev of [...local, ...remote]) map[ev.id] = ev;
+  return Object.values(map).sort((a,b)=>a.ts.localeCompare(b.ts));
+}
+
+// ── PERSISTENCIA ─────────────────────────────────────────
+async function loadLocal() {
+  const saved = await dbGet('events');
+  events = Array.isArray(saved) ? saved : [];
+  state  = deriveState(events);
+}
+
+// ════════════════════════════════════════════════════════
+//  SINCRONIZACIÓN CON GOOGLE DRIVE
+// ════════════════════════════════════════════════════════
+
+function setSyncStatus(text, mode='') {
+  const dot=$('syncDot'), txt=$('syncTxt');
+  txt.textContent = text;
+  dot.className = 'dot'+(mode?' '+mode:'');
+}
+
+async function fetchDriveEvents() {
+  const res = await fetch(gasUrl+'?action=load&t='+Date.now());
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const r = await res.json();
+  if(r.status==='empty') return null;
+  if(r.status!=='ok') throw new Error(r.message||'Error Drive');
+  const raw = typeof r.data==='string' ? JSON.parse(r.data) : r.data;
+  return Array.isArray(raw.events) ? raw.events : null;
+}
+
+async function pushDriveEvents(evts) {
+  const body = JSON.stringify({events:evts, _device:deviceId, _ts:now()});
+  const res = await fetch(gasUrl, {method:'POST',
+    headers:{'Content-Type':'text/plain'}, body});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const r = await res.json();
+  if(r.status!=='ok') throw new Error(r.message||'Error al guardar');
+}
+
+async function syncNow() {
+  if(!gasUrl) return configDrive();
+  setSyncStatus('Sincronizando…','syncing');
+  try {
+    const remote = await fetchDriveEvents();
+
+    if(!remote) {
+      // Drive vacío → preguntar si subir
+      if(events.length===0) { setSyncStatus('Drive vacío · sin datos locales'); return; }
+      showModal('☁ Drive vacío',
+        `Tienes ${events.length} eventos locales. ¿Subir a Drive ahora?`,
+        [{label:'Sí, subir ☁', cls:'btn-p', fn:uploadNow},
+         {label:'Cancelar',   cls:'',      fn:()=>{}}]);
+      return;
+    }
+
+    // ← AQUÍ ESTÁ LA MAGIA: merge sin conflictos
+    const merged  = mergeEvents(events, remote);
+    const newEvts = merged.length - events.length;
+
+    events = merged;
+    state  = deriveState(events);
+    await dbSet('events', events);
+    await pushDriveEvents(events);
+
+    setSyncStatus(`Sync OK · ${events.length} eventos · ${now().slice(11,16)}`, 'ok');
+    toast(newEvts>0 ? `✓ Sync · +${newEvts} eventos nuevos` : '✓ Ya estaba sincronizado');
+    renderAll();
+  } catch(e) {
+    setSyncStatus('Error: '+e.message);
+    toast('Error de sync: '+e.message);
+  }
+}
+
+async function uploadNow(showMsg=true) {
+  if(!gasUrl) return configDrive();
+  try {
+    await pushDriveEvents(events);
+    setSyncStatus(`Subido · ${events.length} eventos · ${now().slice(11,16)}`, 'ok');
+    if(showMsg) toast(`☁ Subido (${events.length} eventos)`);
+  } catch(e) { toast('Error al subir: '+e.message); }
+}
+
+function configDrive() {
+  const url = prompt('Pega la URL de tu Google Apps Script Web App:', gasUrl||'');
+  if(url===null) return;
+  if(!url.trim().startsWith('https://')) return toast('URL inválida');
+  gasUrl = url.trim();
+  localStorage.setItem('dm2_gas', gasUrl);
+  toast('✓ Drive URL configurada');
+  setSyncStatus('Drive listo · Presiona Sync', 'ok');
+}
+
+// ── MODAL ────────────────────────────────────────────────
+function showModal(title, body, btns) {
+  $('modal').classList.remove('hidden');
+  $('modalT').textContent = title;
+  $('modalB').textContent = body;
+  const a=$('modalA'); a.innerHTML='';
+  btns.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+(b.cls||'');
+    btn.textContent=b.label;
+    btn.onclick=()=>{ $('modal').classList.add('hidden'); b.fn(); };
+    a.appendChild(btn);
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  HELPERS DE ESTADO
+// ════════════════════════════════════════════════════════
+const recById  = id => state.recetas.find(r=>r.id===id);
+const ingById  = id => state.ingredientes.find(i=>i.id===id);
+const ingByNom = n  => state.ingredientes.find(i=>(i.nombre||'').toLowerCase()===n.toLowerCase());
+const provByNom= n  => state.proveedores.find(p=>(p.nombre||'').toLowerCase()===n.toLowerCase());
+
+function stockProducto(recetaId) {
+  const prod  = state.producciones.filter(p=>p.recetaId===recetaId).reduce((a,p)=>a+Number(p.unidadesReales||0),0);
+  const vend  = state.ventas.filter(v=>v.recetaId===recetaId).reduce((a,v)=>a+Number(v.unidades||0),0);
+  const merma = state.mermas.filter(m=>m.recetaId===recetaId).reduce((a,m)=>a+Number(m.cantidad||0),0);
+  return Math.max(0, prod-vend-merma);
+}
+
+// ════════════════════════════════════════════════════════
+//  MUTACIONES
+// ════════════════════════════════════════════════════════
+
+async function addReceta() {
+  const nombre = $('rNom').value.trim();
+  const rinde  = Number($('rRin').value||0);
+  if(!nombre) return toast('Escribe el nombre de la receta');
+  const ev = await dispatch('add_receta',{id:uuidv4(),nombre,rinde,precio:0});
+  lastActionId = ev.id; $('rNom').value=''; toast('✓ Receta agregada');
+}
+
+async function addVenta() {
+  const recetaId = $('vRec').value;
+  const uni = Number($('vUni').value||0);
+  const pre = Number($('vPre').value||0);
+  if(!recetaId||uni<=0||pre<=0) return toast('Completa todos los campos');
+  const stk = stockProducto(recetaId);
+  if(uni>stk) return toast(`Stock insuficiente · hay ${stk}u`);
+  const ev = await dispatch('add_venta',{
+    id:uuidv4(), fecha:today(), recetaId, unidades:uni, precio:pre,
+    canal:$('vCan').value, nota:$('vNota').value.trim(), cobrado:true
+  });
+  lastActionId=ev.id; $('vUni').value='1'; $('vNota').value='';
+  toast('✓ Venta guardada');
+}
+
+async function addPedido() {
+  const cliente  = $('pCli').value.trim();
+  const recetaId = $('pRec').value;
+  const cant     = Number($('pCan').value||0);
+  const pre      = Number($('pPre').value||0);
+  if(!cliente||!recetaId||cant<=0) return toast('Completa cliente, receta y cantidad');
+  const ev = await dispatch('add_pedido',{
+    id:uuidv4(), fecha:today(), cliente,
+    fechaEntrega:$('pFec').value||null,
+    anticipo:Number($('pAnt').value||0),
+    estado:'pendiente',
+    items:[{recetaId,cantidad:cant,precio:pre}]
+  });
+  lastActionId=ev.id; $('pCli').value=''; $('pAnt').value='';
+  toast('✓ Pedido guardado');
+}
+
+async function addCompra() {
+  const nombre = $('cIng').value.trim();
+  const qty    = Number($('cQty').value||0);
+  const precio = Number($('cPre').value||0);
+  if(!nombre||qty<=0) return toast('Completa ingrediente y cantidad');
+
+  let ing    = ingByNom(nombre);
+  let ingId  = ing ? ing.id : uuidv4();
+  if(!ing) await dispatch('add_ingrediente',{id:ingId,nombre,unidad:'kg',stock:0,min:0,precio:precio||0});
+
+  let provId = null;
+  const pNom = $('cPro').value.trim();
+  if(pNom) {
+    let prov = provByNom(pNom);
+    if(!prov) { provId=uuidv4(); await dispatch('add_proveedor',{id:provId,nombre:pNom}); }
+    else provId=prov.id;
+  }
+
+  const ev = await dispatch('add_compra',{id:uuidv4(),ingId,ingNombre:nombre,qty,precio,fecha:today(),provId});
+  lastActionId=ev.id;
+  $('cIng').value=''; $('cQty').value=''; $('cPre').value=''; $('cPro').value='';
+  toast('✓ Compra guardada');
+}
+
+async function addProduccion() {
+  const recetaId = $('prRec').value;
+  const tandas   = Number($('prTan').value||0);
+  const reales   = Number($('prReal').value||0);
+  if(!recetaId||tandas<=0) return toast('Selecciona receta y tandas');
+  const rec = recById(recetaId);
+  const unidadesReales = reales>0 ? reales : (Number(rec?.rinde||0)*tandas);
+  const ev = await dispatch('add_produccion',{id:uuidv4(),fecha:today(),recetaId,tandas,unidadesReales});
+  lastActionId=ev.id; $('prTan').value='1'; $('prReal').value='';
+  toast('✓ Producción guardada');
+}
+
+async function addMerma() {
+  const recetaId = $('mRec').value;
+  const cant     = Number($('mCan').value||0);
+  if(!recetaId||cant<=0) return toast('Completa receta y cantidad');
+  const stk = stockProducto(recetaId);
+  if(cant>stk) return toast(`Stock insuficiente · hay ${stk}u`);
+  const ev = await dispatch('add_merma',{
+    id:uuidv4(), fecha:today(), recetaId, cantidad:cant,
+    motivo:$('mMot').value||'No especificado'
+  });
+  lastActionId=ev.id; $('mCan').value='1';
+  toast('✓ Merma registrada');
+}
+
+async function addExtraccion() {
+  const monto = Number($('fMon').value||0);
+  if(monto<=0) return toast('Monto inválido');
+  const ev = await dispatch('add_extraccion',{
+    id:uuidv4(), fecha:today(), tipo:'retiro', monto, concepto:'Extracción móvil'
+  });
+  lastActionId=ev.id; $('fMon').value='';
+  toast('✓ Extracción registrada');
+}
+
+async function undoLast() {
+  if(!lastActionId) return toast('Sin acción reciente para deshacer');
+  const last = events.find(e=>e.id===lastActionId);
+  if(!last) return toast('Acción no encontrada');
+  const map = {
+    add_venta:'undo_venta', add_pedido:'undo_pedido',
+    add_compra:'undo_compra', add_produccion:'undo_produccion',
+    add_merma:'undo_merma', add_extraccion:'undo_extraccion',
+    add_receta:'del_receta'
+  };
+  const undoType = map[last.type];
+  if(!undoType) return toast('Esta acción no se puede deshacer');
+  await dispatch(undoType,{id:last.payload.id});
+  lastActionId=null; toast('↩ Deshecho');
+}
+
+// ── IMPORT / EXPORT ──────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify({events,_dev:deviceId,_ts:now()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`dm-backup-${today()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function importJSON() {
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='application/json';
+  inp.onchange=async()=>{
+    const file=inp.files?.[0]; if(!file) return;
+    try {
+      const raw=JSON.parse(await file.text());
+      if(!Array.isArray(raw.events)) return toast('Formato no reconocido');
+      const merged=mergeEvents(events,raw.events);
+      events=merged; state=deriveState(events);
+      await dbSet('events',events); renderAll();
+      toast(`✓ Importado · ${events.length} eventos`);
+    } catch(e) { toast('Error: '+e.message); }
+  };
+  inp.click();
+}
+
+// ════════════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ════════════════════════════════════════════════════════
+function go(sec) {
+  SECTIONS.forEach(s=>{
+    document.getElementById('s-'+s).classList.toggle('on',s===sec);
+    const tab=document.getElementById('t-'+s);
+    if(tab) tab.classList.toggle('on',s===sec);
+  });
+}
+
+// ── Atajo: abrir compras desde stock bajo
+function quickCompra(nombre) {
+  go('compras'); const el=$('cIng');
+  if(el){el.value=nombre; el.focus();}
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════
+function renderSelects() {
+  const opts='<option value="">— Seleccionar —</option>' +
+    state.recetas.map(r=>`<option value="${r.id}">${r.nombre||'?'} (${stockProducto(r.id)}u)</option>`).join('');
+  ['vRec','pRec','prRec','mRec'].forEach(id=>{if($(id))$(id).innerHTML=opts;});
+}
+
+function renderHome() {
+  const h     = today();
+  const vHoy  = state.ventas.filter(v=>v.fecha===h&&v.cobrado!==false);
+  const inHoy = vHoy.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
+  const pAct  = state.pedidos.filter(p=>p.estado!=='entregado').length;
+  const sLow  = state.ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0)).length;
+  $('kpiHome').innerHTML = `
+    <div class="ki" onclick="homeKpi('fin')"><div class="kv">${money(inHoy)}</div><div class="kl">Ingresos hoy</div></div>
+    <div class="ki" onclick="homeKpi('ventas')"><div class="kv">${vHoy.length}</div><div class="kl">Ventas hoy</div></div>
+    <div class="ki" onclick="homeKpi('pedidos')"><div class="kv">${pAct}</div><div class="kl">Pedidos activos</div></div>
+    <div class="ki" onclick="homeKpi('low')"><div class="kv ${sLow?'':''}">
+      ${sLow>0?`<span style="color:var(--danger)">${sLow}</span>`:0}</div>
+      <div class="kl">Stock bajo mínimo</div></div>`;
+  renderLowPanel();
+}
+
+function homeKpi(action) {
+  if(action==='low'){lowOpen=!lowOpen; renderLowPanel(); return;}
   go(action);
 }
 
-function renderLowStockPanel(){
-  const panel = $('lowStockPanel');
-  if(!panel) return;
-  if(!lowStockOpen){
-    panel.classList.add('hidden');
-    panel.innerHTML = '';
-    return;
-  }
-  const list = (data.ingredientes||[])
-    .filter(i => Number(i.stock||0) <= Number(i.min||0))
-    .sort((a,b) => Number(a.stock||0) - Number(b.stock||0))
-    .slice(0, 12);
-
+function renderLowPanel() {
+  const p=$('lowPanel');
+  if(!lowOpen){p.classList.add('hidden');return;}
+  const list=state.ingredientes.filter(i=>Number(i.stock||0)<=Number(i.min||0))
+    .sort((a,b)=>Number(a.stock||0)-Number(b.stock||0)).slice(0,12);
   if(!list.length){
-    panel.classList.remove('hidden');
-    panel.innerHTML = `<div style="font-size:.8rem;color:var(--muted)">No hay ingredientes bajo mínimo ahora.</div>`;
+    p.classList.remove('hidden');
+    p.innerHTML='<p style="font-size:.8rem;color:var(--ok)">Todo el stock está bien 🎉</p>';
     return;
   }
+  p.classList.remove('hidden');
+  p.innerHTML=list.map(i=>`
+    <div class="srow" onclick="quickCompra('${String(i.nombre||'').replace(/'/g,"\\'")}')">
+      <span style="font-weight:700">${i.nombre}</span>
+      <span style="color:var(--warn);font-weight:700">${Number(i.stock||0)} / min ${Number(i.min||0)} ${i.unidad||''}</span>
+    </div>`).join('');
+}
 
-  panel.classList.remove('hidden');
-  panel.innerHTML = `
-    <div style="font-size:.76rem;color:var(--muted);margin-bottom:6px">Stock simplificado (bajo mínimo)</div>
-    ${list.map(i => `
-      <div class="low-stock-row k-click" onclick="openCompraFromIngredient('${String(i.nombre || '').replace(/'/g, "\\'")}')">
-        <span class="low-stock-name">${i.nombre || 'Ingrediente'}</span>
-        <span class="low-stock-val">${Number(i.stock||0)} / min ${Number(i.min||0)} ${i.unidad || ''}</span>
+function renderVentas() {
+  const list=[...state.ventas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  $('vList').innerHTML=list.map(v=>{
+    const r=recById(v.recetaId);
+    return `<div class="li">
+      <div style="display:flex;justify-content:space-between">
+        <div class="li-t">${r?.nombre||'?'} · ${v.unidades}u</div>
+        <div style="color:var(--gold);font-weight:700">${money(Number(v.unidades||0)*Number(v.precio||0))}</div>
       </div>
-    `).join('')}
-  `;
+      <div class="li-s">${v.fecha||''} · ${v.canal||'directo'}${v.nota?' · '+v.nota:''}</div>
+    </div>`;
+  }).join('')||'<p style="color:var(--muted);font-size:.84rem">Sin ventas</p>';
 }
 
-function openCompraFromIngredient(nombre){
-  go('compras');
-  const ingInput = $('cIng');
-  if(ingInput){
-    ingInput.value = nombre || '';
-    ingInput.focus();
-  }
+function renderPedidos() {
+  const list=state.pedidos.filter(p=>p.estado!=='entregado')
+    .sort((a,b)=>String(a.fechaEntrega||'').localeCompare(String(b.fechaEntrega||'')));
+  $('pList').innerHTML=list.map(p=>{
+    const tot=(p.items||[]).reduce((a,it)=>a+Number(it.cantidad||0)*Number(it.precio||0),0);
+    return `<div class="li">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="li-t">${p.cliente||'Cliente'}</div>
+        <span class="badge ${p.estado==='pendiente'?'b-w':'b-ok'}">${p.estado||'pendiente'}</span>
+      </div>
+      <div class="li-s">Entrega: ${p.fechaEntrega||'s/f'} · ${money(tot)}${p.anticipo?` · Ant: ${money(p.anticipo)}`:''}</div>
+    </div>`;
+  }).join('')||'<p style="color:var(--muted);font-size:.84rem">Sin pedidos activos</p>';
 }
 
-function renderVentas(){
-  $('vList').innerHTML = (data.ventas||[]).slice().sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,10).map(v=>{
-    const r = recById(v.recetaId);
-    return `<div class="i"><b>${r?.nombre || 'Receta'}</b> · ${v.unidades}u · ${money(Number(v.unidades)*Number(v.precio))}<br><small>${v.fecha || ''} · ${v.canal || 'directo'}</small></div>`;
-  }).join('') || '<div class="i">Sin ventas</div>';
+function renderCompras() {
+  const list=[...state.compras].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  $('cList').innerHTML=list.map(c=>{
+    const ing=ingById(c.ingId)||{nombre:c.ingNombre||'?',unidad:''};
+    return `<div class="li">
+      <div style="display:flex;justify-content:space-between">
+        <div class="li-t">${ing.nombre} · ${c.qty} ${ing.unidad}</div>
+        <div style="color:var(--gold);font-weight:700">${money(Number(c.qty||0)*Number(c.precio||0))}</div>
+      </div>
+      <div class="li-s">${c.fecha||''}</div>
+    </div>`;
+  }).join('')||'<p style="color:var(--muted);font-size:.84rem">Sin compras</p>';
 }
 
-function renderPedidos(){
-  $('pList').innerHTML = (data.pedidos||[]).filter(p=>p.estado!=='entregado').slice().sort((a,b)=>String(a.fechaEntrega||'').localeCompare(String(b.fechaEntrega||''))).map(p=>{
-    const total = (p.items||[]).reduce((a,it)=>a + Number(it.cantidad||0)*Number(it.precio||0), 0);
-    return `<div class="i"><b>${p.cliente || 'Cliente'}</b> · ${p.estado || 'pendiente'}<br><small>Entrega: ${p.fechaEntrega || 's/f'} · Total: ${money(total)}</small></div>`;
-  }).join('') || '<div class="i">Sin pedidos</div>';
+function renderProduccion() {
+  const list=[...state.producciones].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  $('prList').innerHTML=list.map(p=>{
+    const r=recById(p.recetaId);
+    return `<div class="li">
+      <div class="li-t">${r?.nombre||'?'} · ${p.tandas} tanda${p.tandas!==1?'s':''}</div>
+      <div class="li-s">${p.fecha||''} · ${p.unidadesReales||0}u producidas</div>
+    </div>`;
+  }).join('')||'<p style="color:var(--muted);font-size:.84rem">Sin producción</p>';
 }
 
-function renderCompras(){
-  $('cList').innerHTML = (data.historialCompras||[]).slice().sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,10).map(c=>{
-    const i = (data.ingredientes||[]).find(x=>Number(x.id)===Number(c.ingId));
-    return `<div class="i"><b>${i?.nombre || 'Ingrediente'}</b> · ${c.qty} ${i?.unidad || ''}<br><small>${c.fecha || ''} · ${money(Number(c.qty||0)*Number(c.precio||0))}</small></div>`;
-  }).join('') || '<div class="i">Sin compras</div>';
+function renderMermas() {
+  const list=[...state.mermas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,15);
+  $('mList').innerHTML=list.map(m=>{
+    const r=recById(m.recetaId);
+    return `<div class="li">
+      <div style="display:flex;justify-content:space-between">
+        <div class="li-t">${r?.nombre||'?'}</div>
+        <div style="color:var(--danger);font-weight:700">−${m.cantidad}u</div>
+      </div>
+      <div class="li-s">${m.fecha||''} · ${m.motivo||'Sin motivo'}</div>
+    </div>`;
+  }).join('')||'<p style="color:var(--muted);font-size:.84rem">Sin mermas</p>';
 }
 
-function renderProduccion(){
-  $('prList').innerHTML = (data.producciones||[]).slice().sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,10).map(p=>{
-    const r = recById(p.recetaId);
-    return `<div class="i"><b>${r?.nombre || 'Receta'}</b> · ${p.tandas} tandas<br><small>${p.fecha || ''} · ${p.unidadesReales || (r?.rinde||0)*(p.tandas||0)}u</small></div>`;
-  }).join('') || '<div class="i">Sin producciones</div>';
+function renderFinanzas() {
+  const vt=state.ventas.reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
+  const ct=state.compras.reduce((a,c)=>a+Number(c.qty||0)*Number(c.precio||0),0);
+  const et=state.extracciones.reduce((a,e)=>a+Number(e.monto||0),0);
+  const rt=vt-ct-et;
+  $('finKpi').innerHTML=`
+    <div class="ki"><div class="kv" style="color:var(--ok)">${money(vt)}</div><div class="kl">Ventas totales</div></div>
+    <div class="ki"><div class="kv" style="color:var(--danger)">${money(ct)}</div><div class="kl">Compras totales</div></div>
+    <div class="ki"><div class="kv" style="color:var(--warn)">${money(et)}</div><div class="kl">Extracciones</div></div>
+    <div class="ki"><div class="kv" style="color:${rt>=0?'var(--ok)':'var(--danger)'}">${money(rt)}</div><div class="kl">Resultado</div></div>`;
+
+  // Recetas
+  $('recList').innerHTML=state.recetas.length
+    ? state.recetas.map(r=>`
+      <div class="rec-row">
+        <span style="font-weight:700">${r.nombre}</span>
+        <span style="color:var(--muted);font-size:.78rem">Rinde ${r.rinde||'?'}u · Stock ${stockProducto(r.id)}u</span>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:.84rem">Sin recetas — agrega una arriba</p>';
 }
 
-function renderMermas(){
-  $('mList').innerHTML = (data.mermas||[]).slice().sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,10).map(m=>{
-    const r = recById(m.recetaId);
-    return `<div class="i"><b>${r?.nombre || 'Receta'}</b> · -${m.cantidad}u<br><small>${m.fecha || ''} · ${m.motivo || 'Sin motivo'}</small></div>`;
-  }).join('') || '<div class="i">Sin mermas</div>';
+function renderAll() {
+  renderSelects();
+  renderHome(); renderVentas(); renderPedidos();
+  renderCompras(); renderProduccion(); renderMermas(); renderFinanzas();
 }
 
-function renderFinanzas(){
-  const ventas = (data.ventas||[]).reduce((a,v)=>a+Number(v.unidades||0)*Number(v.precio||0),0);
-  const compras = (data.historialCompras||[]).reduce((a,c)=>a+Number(c.qty||0)*Number(c.precio||0),0);
-  const gastos = (data.gastosFijos||[]).reduce((a,g)=>a+Number(g.monto||0),0);
-  const retiros = (data.extracciones||[]).reduce((a,e)=>a+Number(e.monto||0),0);
-  $('finKpi').innerHTML = `
-    <div class="k"><div class="kv">${money(ventas)}</div><div class="kl">Ventas acumuladas</div></div>
-    <div class="k"><div class="kv">${money(compras)}</div><div class="kl">Compras acumuladas</div></div>
-    <div class="k"><div class="kv">${money(gastos+retiros)}</div><div class="kl">Salidas</div></div>
-    <div class="k"><div class="kv">${money(ventas-compras-gastos-retiros)}</div><div class="kl">Resultado</div></div>`;
-}
-
-function renderAll(){
-  renderSelectRecetas();
-  renderHome(); renderVentas(); renderPedidos(); renderCompras(); renderProduccion(); renderMermas(); renderFinanzas();
-}
-
-async function persistAndRender(msg){
-  data._guardado = nowISOLocal();
-  await saveLocal();
-  renderAll();
-  if(msg) toast(msg);
-}
-
-async function addVenta(){
-  const recetaId = Number($('vRec').value || 0);
-  const unidades = Number($('vUni').value || 0);
-  const precio = Number($('vPre').value || 0);
-  if(!recetaId || unidades<=0 || precio<=0) return toast('Completa venta');
-  if(unidades > stockProducto(recetaId)) return toast('Stock insuficiente');
-  const venta = {id:nextId('ventas'),fecha:today(),recetaId,unidades,precio,propina:0,canal:$('vCan').value,nota:$('vNota').value.trim(),cobrado:true};
-  data.ventas.push(venta);
-  pushHistory('venta_add',{id:venta.id});
-  await persistAndRender('Venta guardada');
-}
-
-async function addPedido(){
-  const cliente = $('pCli').value.trim();
-  const recetaId = Number($('pRec').value || 0);
-  const cantidad = Number($('pCan').value || 0);
-  const precio = Number($('pPre').value || 0);
-  if(!cliente || !recetaId || cantidad<=0) return toast('Completa pedido');
-  const pedido = {
-    id:nextId('pedidos'),fecha:today(),cliente,fechaEntrega:$('pFec').value||null,anticipo:Number($('pAnt').value||0),notas:'',
-    estado:'pendiente',ventaIds:[],items:[{recetaId,cantidad,precio}]
-  };
-  data.pedidos.push(pedido);
-  pushHistory('pedido_add',{id:pedido.id});
-  await persistAndRender('Pedido guardado');
-}
-
-async function addCompra(){
-  const nombreIng = $('cIng').value.trim();
-  const qty = Number($('cQty').value || 0);
-  const precio = Number($('cPre').value || 0);
-  if(!nombreIng || qty<=0) return toast('Completa compra');
-  let ing = ingByName(nombreIng);
-  if(!ing){
-    ing = {id:nextId('ingredientes'),nombre:nombreIng,unidad:'kg',stock:0,min:0,precio:precio||0};
-    data.ingredientes.push(ing);
-  }
-  let prov = null;
-  const nombreProv = $('cPro').value.trim();
-  if(nombreProv){
-    prov = provByName(nombreProv);
-    if(!prov){ prov = {id:nextId('proveedores'),nombre:nombreProv,contacto:'',notas:''}; data.proveedores.push(prov); }
-  }
-  const compra = {id:nextId('historialCompras'),ingId:ing.id,qty,precio,fecha:today(),provId:prov?.id || null,notas:''};
-  data.historialCompras.push(compra);
-  ing.stock = Number(ing.stock || 0) + qty;
-  if(precio>0) ing.precio = precio;
-  if(Array.isArray(data.lotesIngredientes)){
-    data.lotesIngredientes.push({id:nextId('lotesIngredientes'),ingredienteId:ing.id,cantidad:qty,cantidadRestante:qty,costoUnitario:precio||0,fechaIngreso:today(),proveedorId:prov?.id||null,compraId:compra.id,nota:''});
-  }
-  pushHistory('compra_add',{id:compra.id,ingId:ing.id,qty});
-  await persistAndRender('Compra guardada');
-}
-
-async function addProduccion(){
-  const recetaId = Number($('prRec').value || 0);
-  const tandas = Number($('prTan').value || 0);
-  const reales = Number($('prReal').value || 0);
-  if(!recetaId || tandas<=0) return toast('Completa producción');
-  const r = recById(recetaId);
-  if(!r) return toast('Receta no encontrada');
-  const prod = {id:nextId('producciones'),fecha:today(),recetaId,tandas,unidadesReales:reales>0?reales:(Number(r.rinde||0)*tandas),nota:''};
-  data.producciones.push(prod);
-  pushHistory('prod_add',{id:prod.id});
-  await persistAndRender('Producción guardada');
-}
-
-async function addMerma(){
-  const recetaId = Number($('mRec').value || 0);
-  const cantidad = Number($('mCan').value || 0);
-  if(!recetaId || cantidad<=0) return toast('Completa merma');
-  if(cantidad > stockProducto(recetaId)) return toast('Stock insuficiente para merma');
-  const merma = {id:nextId('mermas'),fecha:today(),recetaId,cantidad,motivo:$('mMot').value.trim() || 'No especificado',nota:''};
-  data.mermas.push(merma);
-  pushHistory('merma_add',{id:merma.id});
-  await persistAndRender('Merma guardada');
-}
-
-async function addExtraccion(){
-  const monto = Number($('fMon').value || 0);
-  if(monto<=0) return toast('Monto inválido');
-  const ext = {id:nextId('extracciones'),fecha:today(),tipo:'retiro',monto,concepto:'Extracción móvil'};
-  data.extracciones.push(ext);
-  pushHistory('ext_add',{id:ext.id});
-  await persistAndRender('Extracción registrada');
-}
-
-async function undoLast(){
-  const a = history.shift();
-  if(!a) return toast('Nada para deshacer');
-  if(a.type==='venta_add') data.ventas = data.ventas.filter(x=>x.id!==a.payload.id);
-  if(a.type==='pedido_add') data.pedidos = data.pedidos.filter(x=>x.id!==a.payload.id);
-  if(a.type==='prod_add') data.producciones = data.producciones.filter(x=>x.id!==a.payload.id);
-  if(a.type==='merma_add') data.mermas = data.mermas.filter(x=>x.id!==a.payload.id);
-  if(a.type==='ext_add') data.extracciones = data.extracciones.filter(x=>x.id!==a.payload.id);
-  if(a.type==='compra_add'){
-    data.historialCompras = data.historialCompras.filter(x=>x.id!==a.payload.id);
-    const ing = (data.ingredientes||[]).find(i=>Number(i.id)===Number(a.payload.ingId));
-    if(ing) ing.stock = Math.max(0, Number(ing.stock||0) - Number(a.payload.qty||0));
-    data.lotesIngredientes = (data.lotesIngredientes||[]).filter(l=>Number(l.compraId)!==Number(a.payload.id));
-  }
-  await persistAndRender('Acción deshecha');
-}
-
-async function fetchDrive(){
-  if(!gasUrl) return null;
-  const res = await fetch(gasUrl + '?action=load&t=' + Date.now());
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  const r = await res.json();
-  if(r.status==='empty') return null;
-  if(r.status!=='ok') throw new Error(r.message || 'Error Drive');
-  return normalize(typeof r.data === 'string' ? JSON.parse(r.data) : r.data);
-}
-
-async function pushDrive(payload){
-  const res = await fetch(gasUrl, {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  const r = await res.json();
-  if(r.status!=='ok') throw new Error(r.message || 'Error guardando');
-}
-
-function sameData(a,b){
-  const norm = x => JSON.stringify(Object.fromEntries(DATA_KEYS.map(k => [k, x[k] || []])));
-  return norm(a) === norm(b);
-}
-
-function mergeData(local, drive){
-  const merged = normalize(local);
-  DATA_KEYS.forEach(k => {
-    const lArr = local[k] || [];
-    const dArr = drive[k] || [];
-    const lMap = Object.fromEntries(lArr.filter(x=>x&&x.id!=null).map(x=>[String(x.id),x]));
-    const dMap = Object.fromEntries(dArr.filter(x=>x&&x.id!=null).map(x=>[String(x.id),x]));
-    const ids = new Set([...Object.keys(lMap), ...Object.keys(dMap)]);
-    merged[k] = [...ids].map(id => dMap[id] || lMap[id]).filter(Boolean);
-  });
-  merged.nextId = {};
-  NEXT_KEYS.forEach(k => merged.nextId[k] = Math.max(Number(local.nextId?.[k]||1), Number(drive.nextId?.[k]||1)));
-  return normalize(merged);
-}
-
-async function syncNow(){
-  try{
-    if(!gasUrl) return configDrive();
-    toast('Sincronizando...');
-    const drive = await fetchDrive();
-    if(!drive && data && data._guardado){
-      const ok = confirm('Drive está vacío. ¿Subir datos locales?');
-      if(ok) return await uploadNow();
-      return toast('Drive vacío');
-    }
-    if(!drive){
-      toast('No hay datos en Drive');
-      return;
-    }
-    if(!data || !data._guardado){
-      data = normalize(drive);
-      lastSync = nowISOLocal();
-      await saveLocal();
-      renderAll();
-      return toast('Datos descargados de Drive');
-    }
-    if(sameData(data, drive)){
-      lastSync = nowISOLocal();
-      await saveLocal();
-      return toast('Ya está sincronizado');
-    }
-    const tsL = data._guardado ? new Date(data._guardado).getTime() : 0;
-    const tsD = drive._guardado ? new Date(drive._guardado).getTime() : 0;
-    if(tsD > tsL){
-      const mode = prompt('Hay diferencias. Escribe: "drive" (usar nube), "local" (subir móvil) o "merge" (fusionar).', 'merge');
-      if(mode === 'drive'){
-        data = normalize(drive);
-        lastSync = nowISOLocal();
-        await saveLocal();
-        renderAll();
-        return toast('Se aplicó versión de Drive');
-      }
-      if(mode === 'local'){
-        return await uploadNow();
-      }
-      const merged = mergeData(data, drive);
-      data = merged;
-      await uploadNow(false);
-      return toast('Fusión completada y subida');
-    } else {
-      return await uploadNow();
-    }
-  }catch(e){
-    toast('Error sync: ' + e.message);
-  }
-}
-
-async function uploadNow(showMsg=true){
-  try{
-    if(!gasUrl) return configDrive();
-    const payload = buildPayload();
-    await pushDrive(payload);
-    data = payload;
-    lastSync = payload._guardado;
-    await saveLocal();
-    if(showMsg) toast('Subido a Drive');
-  }catch(e){
-    toast('Error subida: ' + e.message);
-  }
-}
-
-function configDrive(){
-  const url = prompt('Pega URL de Google Apps Script Web App:', gasUrl || '');
-  if(url === null) return;
-  if(!url.trim().startsWith('https://')) return toast('URL inválida');
-  gasUrl = url.trim();
-  localStorage.setItem('gas_url', gasUrl);
-  toast('URL de Drive configurada');
-}
-
-function backupLocal(){
-  const payload = buildPayload();
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'dulce-masa-mobile-backup.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function importLocal(){
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json';
-  input.onchange = async () => {
-    const file = input.files && input.files[0];
-    if(!file) return;
-    const txt = await file.text();
-    data = normalize(JSON.parse(txt));
-    await persistAndRender('Backup importado');
-  };
-  input.click();
-}
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-}
-
-$('btnSync').addEventListener('click', syncNow);
-$('btnUpload').addEventListener('click', ()=>uploadNow(true));
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+$('btnSync').addEventListener('click',  syncNow);
+$('btnUpload').addEventListener('click',()=>uploadNow(true));
 
 (async function init(){
   await loadLocal();
-  if(!data || Object.values(data).length===0) data = normalize({});
   $('pFec').value = today();
   renderAll();
   go('home');
-  toast(gasUrl ? 'Lista para sincronizar con Drive' : 'Configura URL de Drive para sincronizar');
+  setSyncStatus(
+    gasUrl
+      ? `Drive listo · ${events.length} eventos locales`
+      : 'Sin Drive · Presiona ⚙ Drive URL en Herramientas',
+    gasUrl ? 'ok' : ''
+  );
 })();
 </script>
 </body>
