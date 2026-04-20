@@ -627,7 +627,204 @@ async function fetchDriveEvents() {
   if(r.status==='empty') return null;
   if(r.status!=='ok') throw new Error(r.message||'Error Drive');
   const raw = typeof r.data==='string' ? JSON.parse(r.data) : r.data;
-  return Array.isArray(raw.events) ? raw.events : null;
+  
+  // Si ya está en formato de eventos (nuevo sistema)
+  if (Array.isArray(raw.events)) {
+    return raw.events;
+  }
+  
+  // Si está en formato antiguo (sistema original) - convertir a eventos
+  if (raw.ingredientes || raw.recetas || raw.ventas) {
+    return convertLegacyDataToEvents(raw);
+  }
+  
+  return null;
+}
+
+// Convierte datos del formato antiguo al nuevo sistema de eventos
+function convertLegacyDataToEvents(legacyData) {
+  const convertedEvents = [];
+  const timestamp = now();
+  
+  // Convertir ingredientes
+  if (Array.isArray(legacyData.ingredientes)) {
+    legacyData.ingredientes.forEach(ing => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_ingrediente',
+        payload: {
+          id: ing.id,
+          nombre: ing.nombre,
+          unidad: ing.unidad || 'kg',
+          stock: ing.stock || 0,
+          min: ing.min || 0,
+          precio: ing.precio || 0
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir recetas
+  if (Array.isArray(legacyData.recetas)) {
+    legacyData.recetas.forEach(rec => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_receta',
+        payload: {
+          id: rec.id,
+          nombre: rec.nombre,
+          rinde: rec.rinde || 1,
+          precio: rec.precioVenta || 0
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir ventas
+  if (Array.isArray(legacyData.ventas)) {
+    legacyData.ventas.forEach(v => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_venta',
+        payload: {
+          id: v.id,
+          fecha: v.fecha,
+          recetaId: v.recetaId,
+          unidades: v.unidades,
+          precio: v.precio,
+          canal: v.canal || 'directo',
+          nota: v.nota || '',
+          cobrado: v.cobrado !== false
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir pedidos
+  if (Array.isArray(legacyData.pedidos)) {
+    legacyData.pedidos.forEach(p => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_pedido',
+        payload: {
+          id: p.id,
+          fecha: p.fecha,
+          cliente: p.cliente,
+          fechaEntrega: p.fechaEntrega,
+          anticipo: p.anticipo || 0,
+          estado: p.estado || 'pendiente',
+          items: p.items || []
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir compras
+  if (Array.isArray(legacyData.historialCompras)) {
+    legacyData.historialCompras.forEach(c => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_compra',
+        payload: {
+          id: c.id,
+          ingId: c.ingId,
+          ingNombre: c.ingNombre,
+          qty: c.qty,
+          precio: c.precio,
+          fecha: c.fecha,
+          provId: c.provId
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir producciones
+  if (Array.isArray(legacyData.producciones)) {
+    legacyData.producciones.forEach(p => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_produccion',
+        payload: {
+          id: p.id,
+          fecha: p.fecha,
+          recetaId: p.recetaId,
+          tandas: p.tandas,
+          unidadesReales: p.unidadesReales
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir mermas
+  if (Array.isArray(legacyData.mermas)) {
+    legacyData.mermas.forEach(m => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_merma',
+        payload: {
+          id: m.id,
+          fecha: m.fecha,
+          recetaId: m.recetaId,
+          cantidad: m.cantidad,
+          motivo: m.motivo || 'No especificado'
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir extracciones
+  if (Array.isArray(legacyData.extracciones)) {
+    legacyData.extracciones.forEach(e => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_extraccion',
+        payload: {
+          id: e.id,
+          fecha: e.fecha,
+          tipo: e.tipo || 'retiro',
+          monto: e.monto,
+          concepto: e.concepto || 'Extracción'
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  // Convertir proveedores
+  if (Array.isArray(legacyData.proveedores)) {
+    legacyData.proveedores.forEach(p => {
+      convertedEvents.push({
+        id: uuidv4(),
+        type: 'add_proveedor',
+        payload: {
+          id: p.id,
+          nombre: p.nombre,
+          contacto: p.contacto || '',
+          tel: p.tel || '',
+          email: p.email || ''
+        },
+        ts: timestamp,
+        device: 'legacy-import'
+      });
+    });
+  }
+  
+  return convertedEvents.sort((a,b)=>a.ts.localeCompare(b.ts));
 }
 
 async function pushDriveEvents(evts) {

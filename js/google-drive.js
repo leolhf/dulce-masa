@@ -104,18 +104,26 @@ async function gdriveLoad(){
   const url = _gasGetUrl();
   if(!url) return;
   try{
-    _gdriveActualizarUI(true, '⏳ Cargando…');
+    _gdriveActualizarUI(true, 'Cargando...');
     const resp = await fetch(url + '?action=load', {method:'GET'});
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const result = await resp.json();
     if(result.status === 'empty'){
       _gdriveActualizarUI(true);
-      toast('☁ No hay datos en Drive aún. Guardá primero.');
+      toast(' No hay datos en Drive aún. Guardá primero.');
       return;
     }
     if(result.status !== 'ok') throw new Error(result.message || 'Error en el script');
-    const driveData = JSON.parse(result.data);
-
+    
+    let driveData = JSON.parse(result.data);
+    
+    // Verificar si está en formato de eventos (nuevo sistema móvil)
+    if (Array.isArray(driveData.events)) {
+      // Convertir eventos a formato tradicional para compatibilidad
+      driveData = convertEventsToLegacyData(driveData.events);
+      toast(' Detectados datos de móvil v2 - Convertidos automáticamente');
+    }
+    
     // Comparar con datos locales
     const localData = buildData();
     const diff = _gdriveDiff(localData, driveData);
