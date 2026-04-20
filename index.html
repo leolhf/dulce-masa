@@ -1816,6 +1816,53 @@
 
 <div id="toast"></div>
 
+<script>
+// Corrector ortografico global (fase 1): aplica a campos de texto y omite numeros/fechas.
+(function () {
+  const TEXT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel']);
+  const SKIP_IDS = new Set([
+    'buscador-general',
+    'stock-q'
+  ]);
+
+  function shouldEnable(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.dataset.noSpellcheck === 'true') return false;
+    if (el.id && SKIP_IDS.has(el.id)) return false;
+    if (el.tagName === 'TEXTAREA') return true;
+    if (el.tagName !== 'INPUT') return false;
+    const type = (el.type || 'text').toLowerCase();
+    return TEXT_TYPES.has(type);
+  }
+
+  function applySpellcheck(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    const fields = scope.querySelectorAll('input, textarea');
+    fields.forEach((el) => {
+      if (!shouldEnable(el)) return;
+      el.spellcheck = true;
+      el.setAttribute('lang', 'es');
+      if (!el.hasAttribute('autocapitalize')) el.setAttribute('autocapitalize', 'sentences');
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => applySpellcheck(document));
+  } else {
+    applySpellcheck(document);
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      m.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) applySpellcheck(node);
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
+
 
 <!-- ══ Módulos JavaScript — cargar en este orden ══ -->
 <!-- ══ CAPA 0: Núcleo — sin dependencias ══ -->
