@@ -243,12 +243,106 @@ function obtenerCostoPromedio(ingredienteId) {
   return cantidadTotal > 0 ? costoTotal / cantidadTotal : 0;
 }
 
+// Retorna el precio unitario del lote más reciente (aunque esté agotado)
+// Sirve como "último precio activo" cuando no hay stock disponible
+function obtenerUltimoPrecioFIFO(ingredienteId) {
+  const lotes = lotesIngredientes
+    .filter(l => l.ingredienteId === ingredienteId)
+    .sort((a, b) =>
+      new Date(b.fechaIngreso) - new Date(a.fechaIngreso) ||
+      (b.id || 0) - (a.id || 0)
+    );
+  return lotes.length > 0 ? lotes[0].costoUnitario : null;
+}
+
 // Función para sincronizar stock de ingredientes con lotes
+// Preserva el último precio FIFO conocido cuando todos los lotes están agotados
 function sincronizarStockConLotes() {
   ingredientes.forEach(ingrediente => {
     ingrediente.stock = obtenerStockDesdeLotes(ingrediente.id);
-    ingrediente.precio = obtenerCostoPromedio(ingrediente.id);
+    const promedio = obtenerCostoPromedio(ingrediente.id);
+    if (promedio > 0) {
+      // Hay lotes disponibles → usar promedio ponderado real
+      ingrediente.precio = promedio;
+    } else {
+      // Sin stock disponible → preservar último precio FIFO para no perder referencia
+      const ultimoPrecio = obtenerUltimoPrecioFIFO(ingrediente.id);
+      if (ultimoPrecio !== null && ultimoPrecio > 0) {
+        ingrediente.precio = ultimoPrecio;
+      }
+      // Si no hay historial de lotes, dejar el precio actual sin modificar
+    }
   });
+}
+
+// Estima costo FIFO sin mutar stock/lotes.
+// A diferencia de estimarCostoFIFO, NO lanza error cuando el stock se agota:
+// usa el último precio FIFO conocido para la cantidad que falte, manteniendo
+// un precio fiable en recetas aunque el lote activo se haya terminado.
+function estimarCostoFIFOConFallback(receta, tandas) {
+  let costoTotal = 0;
+  const detalleConsumo = [];
+
+  receta.ings.forEach(ingReceta => {
+    const ingrediente = ing(ingReceta.ingId);
+    if (!ingrediente) return;
+
+    const cantidadNecesaria = ingReceta.qty * tandas;
+    const lotesDisponibles = obtenerLotesDisponibles(ingReceta.ingId)
+      .map(l => ({ ...l })); // copias para no mutar
+
+    let cantidadPorConsumir = cantidadNecesaria;
+    let costoIngrediente = 0;
+    const consumoLotes = [];
+
+    // Consumir de lotes en orden FIFO
+    for (const lote of lotesDisponibles) {
+      if (cantidadPorConsumir <= 0) break;
+      const cantidadConsumida = Math.min(cantidadPorConsumir, lote.cantidadRestante);
+      const costoConsumo = cantidadConsumida * lote.costoUnitario;
+      costoIngrediente += costoConsumo;
+      consumoLotes.push({
+        loteId: lote.id,
+        cantidadConsumida,
+        costoUnitario: lote.costoUnitario,
+        costoTotal: costoConsumo
+      });
+      cantidadPorConsumir -= cantidadConsumida;
+    }
+
+    // Si los lotes se agotaron antes de cubrir la cantidad necesaria,
+    // usar el último precio FIFO conocido para estimar el costo restante.
+    // Así las recetas no muestran $0 cuando el stock está vacío.
+    if (cantidadPorConsumir > 0) {
+      const ultimoPrecio =
+        obtenerUltimoPrecioFIFO(ingReceta.ingId) ??
+        (ingrediente.precio || 0);
+      const costoFaltante = cantidadPorConsumir * ultimoPrecio;
+      costoIngrediente += costoFaltante;
+      consumoLotes.push({
+        loteId: null,
+        cantidadConsumida: cantidadPorConsumir,
+        costoUnitario: ultimoPrecio,
+        costoTotal: costoFaltante,
+        esPrecioEstimado: true  // marca visual: precio de referencia, no de lote real
+      });
+    }
+
+    costoTotal += costoIngrediente;
+    detalleConsumo.push({
+      ingredienteId: ingReceta.ingId,
+      ingredienteNombre: ingrediente.nombre,
+      cantidadTotal: cantidadNecesaria,
+      costoTotal: costoIngrediente,
+      lotesConsumidos: consumoLotes
+    });
+  });
+
+  return {
+    costoTotal,
+    costoRealPorUnidad: receta.rinde > 0 ? costoTotal / receta.rinde : 0,
+    detalleConsumo
+  };
 }
 
 function repararLotesConStockGuardado() {
@@ -524,6 +618,8 @@ window.obtenerCostoPromedio           = obtenerCostoPromedio;
 window.sincronizarStockConLotes       = sincronizarStockConLotes;
 window.inicializarLotesDesdeStock     = inicializarLotesDesdeStock;
 window.estimarCostoFIFO               = estimarCostoFIFO;
+window.estimarCostoFIFOConFallback    = estimarCostoFIFOConFallback;
+window.obtenerUltimoPrecioFIFO        = obtenerUltimoPrecioFIFO;
 window.obtenerDetalleLotesIngrediente = obtenerDetalleLotesIngrediente;
 window.editarLoteFIFO                 = editarLoteFIFO;
 window.esLoteSospechosoFIFO           = esLoteSospechosoFIFO;

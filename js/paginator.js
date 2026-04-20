@@ -51,7 +51,7 @@ function _pagGo(key, page) {
   if (!fn) return;
   const totalPags = Math.max(1, Math.ceil(
     key==='ventas'  ? (ventas||[]).length :
-    key==='hist'    ? (historialCompras||[]).length :
+    key==='hist'    ? (ventas||[]).length :
     key==='pedidos' ? (pedidos||[]).length : 0
   ) / p.size);
   p.page = Math.max(1, Math.min(page, totalPags));

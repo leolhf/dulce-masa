@@ -16,6 +16,17 @@
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  // En teléfonos, abrir directamente la interfaz optimizada para campo.
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const forceDesktop = params.get('desktop') === '1' || localStorage.getItem('dm_force_desktop') === '1';
+    const isMobileLike = window.matchMedia('(max-width: 900px)').matches && navigator.maxTouchPoints > 0;
+    if (!forceDesktop && isMobileLike && !window.location.pathname.endsWith('/movil.html')) {
+      window.location.replace('movil.html' + window.location.search + window.location.hash);
+    }
+  })();
+</script>
 </head>
 <body>
 
@@ -140,6 +151,7 @@
     </div>
     <button id="btn-deshacer" onclick="deshacerUltimaAccion()" style="display:flex;align-items:center;gap:5px;background:rgba(212,108,108,.15);color:var(--danger);border:1px solid rgba(212,108,108,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:not-allowed;font-family:'DM Sans',sans-serif;font-weight:500;opacity:0.5" disabled title="Deshacer última acción">↶ Deshacer</button>
     <div class="topbar-right" id="topbar-right">
+      <button id="btn-mobile-mode" onclick="window.location.href='movil.html'" style="display:none;align-items:center;gap:5px;background:rgba(107,175,105,.12);color:var(--ok);border:1px solid rgba(107,175,105,.35);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">📱 Modo móvil</button>
       <button id="btn-pwa-install" onclick="pwaInstall()" style="display:none;align-items:center;gap:5px;background:rgba(196,124,43,.15);color:var(--caramel);border:1px solid rgba(196,124,43,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">⬇ Instalar app</button>
     </div>
   </div>
@@ -1188,17 +1200,53 @@
 
     <!-- VENTAS -->
     <div id="s-ventas" class="section">
-      <div class="grid2-70" style="margin-bottom:17px">
-        <div class="card">
-          <div class="card-header"><span class="card-title" id="venta-form-title">Registrar venta</span></div>
-          <div class="card-body">
-            <input type="hidden" id="venta-edit-id" value="">
-            <div class="form-grid" style="margin-bottom:12px">
-              <div class="form-group"><label>Producción</label><select id="venta-prod" onchange="calcVenta()"><option value="">— Seleccionar —</option></select></div>
-              <div class="form-group"><label>Unidades vendidas</label><input type="number" id="venta-unidades" value="1" min="1" oninput="calcVenta()"></div>
-              <div class="form-group"><label>Precio unitario ($)</label><input type="number" id="venta-precio" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
-              <div class="form-group"><label>Propina ($) <span style="font-size:.7rem;color:var(--text3);font-weight:400">opcional</span></label><input type="number" id="venta-propina" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
-              <div class="form-group"><label>Fecha</label><input type="date" id="venta-fecha"></div>
+
+      <!-- Resumen del día — siempre visible arriba -->
+      <div id="ventas-dia" style="margin-bottom:14px"></div>
+
+      <!-- Tabs principales -->
+      <div class="card">
+        <div style="padding:0 16px;border-bottom:2px solid var(--border)">
+          <div class="tabs-nav" style="margin-bottom:0;border-bottom:none">
+            <button class="tab-btn active" id="vtab-ventas"    onclick="switchVentasTab('ventas')"   >🛒 Registrar venta</button>
+            <button class="tab-btn"        id="vtab-mermas"    onclick="switchVentasTab('mermas')"   >📉 Mermas</button>
+            <button class="tab-btn"        id="vtab-historial" onclick="switchVentasTab('historial')">📋 Historial</button>
+          </div>
+        </div>
+
+        <!-- ── Tab: Registrar venta ── -->
+        <div id="vtab-content-ventas" class="card-body">
+          <h3 id="venta-form-title" style="font-size:.95rem;font-weight:600;margin-bottom:12px">Registrar venta</h3>
+          <input type="hidden" id="venta-edit-id" value="">
+
+          <!-- Fila superior: producto + unidades + precio -->
+          <div class="form-grid" style="margin-bottom:10px">
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Producto</label>
+              <select id="venta-prod" onchange="calcVenta()"><option value="">— Seleccionar —</option></select>
+            </div>
+            <div class="form-group"><label>Unidades</label><input type="number" id="venta-unidades" value="1" min="1" oninput="calcVenta()"></div>
+            <div class="form-group"><label>Precio unitario ($)</label><input type="number" id="venta-precio" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
+            <div class="form-group"><label>Propina ($) <span style="font-size:.7rem;color:var(--text3);font-weight:400">opcional</span></label><input type="number" id="venta-propina" step="0.01" min="0" placeholder="0.00" oninput="calcVenta()"></div>
+            <div class="form-group"><label>Fecha</label><input type="date" id="venta-fecha"></div>
+          </div>
+
+          <!-- Resumen de precio -->
+          <div class="price-box" style="margin-bottom:12px">
+            <div class="price-row"><span>Subtotal:</span><span id="venta-subtotal">$0.00</span></div>
+            <div class="price-row"><span>Propina:</span><span id="venta-propina-display">$0.00</span></div>
+            <div class="price-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+              <strong>Total:</strong><strong id="venta-total">$0.00</strong>
+            </div>
+          </div>
+          <div id="venta-info" style="margin-bottom:10px"></div>
+
+          <!-- Campos opcionales colapsables -->
+          <details style="margin-bottom:12px">
+            <summary style="cursor:pointer;font-size:.8rem;color:var(--text3);font-weight:500;user-select:none;padding:4px 0">
+              ＋ Canal, medio de pago y nota (opcional)
+            </summary>
+            <div class="form-grid" style="margin-top:10px">
               <div class="form-group">
                 <label>Canal de venta</label>
                 <select id="venta-canal">
@@ -1212,6 +1260,18 @@
                 </select>
               </div>
               <div class="form-group">
+                <label>Medio de pago</label>
+                <select id="venta-megma">
+                  <option value="">— Sin especificar —</option>
+                  <option value="efectivo">💵 Efectivo</option>
+                  <option value="transferencia">🏦 Transferencia</option>
+                  <option value="tarjeta">💳 Tarjeta</option>
+                  <option value="yape">📱 Yape/Plin</option>
+                  <option value="qr">🔲 QR</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
                 <label>Cliente / Nota</label>
                 <div style="position:relative">
                   <input type="text" id="venta-nota" placeholder="Ej: María - Cumpleaños" oninput="mostrarSugerenciasVentas(this.value)" onfocus="mostrarSugerenciasVentas(this.value)" onblur="ocultarSugerenciasVentas()">
@@ -1219,47 +1279,23 @@
                 </div>
               </div>
             </div>
-            <div class="price-box">
-              <div class="price-row">
-                <span>Subtotal:</span>
-                <span id="venta-subtotal">$0.00</span>
-              </div>
-              <div class="price-row">
-                <span>Propina:</span>
-                <span id="venta-propina-display">$0.00</span>
-              </div>
-              <div class="price-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
-                <strong>Total:</strong>
-                <strong id="venta-total">$0.00</strong>
-              </div>
-            </div>
-            <div id="venta-info" style="margin-bottom:10px"></div>
-            <div class="form-actions">
-              <button class="btn btn-primary" id="venta-btn-guardar" onclick="registrarVenta()">✓ Registrar venta</button>
-              <button class="btn btn-secondary" id="btn-cancelar-venta" style="display:none" onclick="cancelarEdicionVenta()">✕ Cancelar</button>
-            </div>
+          </details>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" id="venta-btn-guardar" onclick="registrarVenta()">✓ Registrar venta</button>
+            <button class="btn btn-secondary" id="btn-cancelar-venta" style="display:none" onclick="cancelarEdicionVenta()">✕ Cancelar</button>
           </div>
         </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Resumen del día</span></div>
-          <div class="card-body" id="ventas-dia"></div>
+
+        <!-- ── Tab: Mermas ── -->
+        <div id="vtab-content-mermas" class="card-body" style="display:none">
+          <div id="merma-control"></div>
         </div>
-      </div>
-      <div class="grid2" style="margin-bottom:17px">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Control de merma</span></div>
-          <div class="card-body" id="merma-control"></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Top productos rentables</span></div>
-          <div class="card-body" id="top-rentables"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Historial de ventas</span>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="ventas-stats" style="font-size:.79rem;color:var(--text3)"></span>
+
+        <!-- ── Tab: Historial ── -->
+        <div id="vtab-content-historial" style="display:none">
+          <div style="padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border2);background:var(--cream2)">
+            <span id="ventas-stats" style="font-size:.79rem;color:var(--text3);flex:1;min-width:180px"></span>
             <select class="search-input" id="ventas-canal-f" onchange="renderVentasTable()" style="width:130px">
               <option value="">Todos los canales</option>
               <option value="directo">Directo</option>
@@ -1268,15 +1304,23 @@
               <option value="delivery">Delivery</option>
               <option value="evento">Evento</option>
               <option value="otro">Otro</option>
-              <option value="">Sin canal</option>
+            </select>
+            <select class="search-input" id="ventas-megma-f" onchange="renderVentasTable()" style="width:140px">
+              <option value="">Todos los medios</option>
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">🏦 Transferencia</option>
+              <option value="tarjeta">💳 Tarjeta</option>
+              <option value="yape">📱 Yape/Plin</option>
+              <option value="qr">🔲 QR</option>
+              <option value="otro">Otro</option>
             </select>
           </div>
+          <div class="table-wrap">
+            <table id="tbl-ventas"><thead><tr><th>Fecha</th><th>Producto</th><th>Und.</th><th>Precio/u</th><th>Total</th><th>Propina</th><th>Costo</th><th>Ganancia</th><th>Margen</th><th>Canal</th><th>Medio pago</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+          <div id="pag-ventas"></div>
         </div>
-        <div class="card-body" style="padding:0"><div class="table-wrap">
-          <table id="tbl-ventas"><thead><tr><th>Fecha</th><th>Producto</th><th>Und.</th><th>Precio/u</th><th>Total</th><th>Propina</th><th>Costo</th><th>Ganancia</th><th>Margen</th><th>Canal</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
-        </div>
-        <div id="pag-ventas"></div>
-        </div>
+
       </div>
     </div>
 
@@ -1800,6 +1844,7 @@
 <script src="js/gastos-fijos.js"></script>
 <script src="js/autocomplete.js"></script>
 <script src="js/ventas.js"></script>
+<script src="js/mermas.js"></script>
 <script src="js/historial-autocomplete.js"></script>
 <script src="js/historial.js"></script>
 <script src="js/proveedores.js"></script>
@@ -1828,6 +1873,15 @@
 <script src="js/estadisticas.js"></script>
 <script src="js/google-drive.js"></script>
 <script src="js/nav-indicators.js"></script>
+<script>
+  // Muestra acceso rápido a móvil en pantallas pequeñas/tablets.
+  (function () {
+    const btn = document.getElementById('btn-mobile-mode');
+    if (!btn) return;
+    const show = window.matchMedia('(max-width: 1200px)').matches || navigator.maxTouchPoints > 0;
+    btn.style.display = show ? 'inline-flex' : 'none';
+  })();
+</script>
 
 </body>
 </html>

@@ -245,7 +245,7 @@ function calcProd(){
   let costoPreview = calcCosto(recetaCalculo,tandas);
   try{
     if(($('inv-precio-tipo')?.value||'fijo')==='fifo'){
-      costoPreview = estimarCostoFIFO(recetaCalculo, tandas).costoTotal;
+      costoPreview = estimarCostoFIFOConFallback(recetaCalculo, tandas).costoTotal;
     }
   }catch(e){}
   el.innerHTML=`<div style="font-size:.78rem;font-weight:500;color:var(--text2);margin-bottom:7px">Planificado: ${planificado} unidades${reales>0?` · Real: ${reales} unidades`:''} · Costo: ${fmt(costoPreview)}</div>${rows}

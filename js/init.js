@@ -117,13 +117,14 @@ function buildData(){
     _version: 2,
     _guardado: nowISOLocal(),  // timezone.js — ISO con offset local, no UTC
     ingredientes, recetas, producciones, ventas, pedidos,
-    stockProductos, proveedores, historialCompras, lotesIngredientes, catRecetas, gastosFijos, extracciones, prestamos, metas,
-    capital_ajustes: CapitalAdjustment.ajustes,  // Agregar ajustes de capital
+    stockProductos, proveedores, historialCompras, lotesIngredientes, catRecetas, gastosFijos, extracciones, prestamos, metas, mermas,
+    capital_ajustes: CapitalAdjustment.ajustes,
     nextId:{
       ing:nextId?.ing||1, rec:nextId?.rec||1, prod:nextId?.prod||1,
       venta:nextId?.venta||1, comp:nextId?.comp||1,
       prov:nextId?.prov||1, pedido:nextId?.pedido||pedidos?.length+1||1,
-      ext:nextId?.ext||1, prestamo:nextId?.prestamo||1, lote:nextId?.lote||1
+      ext:nextId?.ext||1, prestamo:nextId?.prestamo||1, lote:nextId?.lote||1,
+      merma:nextId?.merma||1
     }
   };
 }
@@ -355,4 +356,5 @@ setInterval(()=>{
     if(sfTs) sfTs.textContent='Guardado '+_fmtTs(_ultimoGuardado);
   }
 },15000);
+
 

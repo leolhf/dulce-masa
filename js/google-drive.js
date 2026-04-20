@@ -176,7 +176,7 @@ function _gdriveDiff(local, drive){
       'ingredientes','recetas','producciones','ventas','pedidos',
       'historialCompras','proveedores','stockProductos',
       'lotesIngredientes','catRecetas','gastosFijos','extracciones',
-      'prestamos','metas','capital_ajustes'
+      'prestamos','metas','capital_ajustes','mermas'
     ];
     const norm = obj => Object.fromEntries(DATA_KEYS.map(k => [k, obj[k] ?? []]));
     if(JSON.stringify(norm(local)) !== JSON.stringify(norm(drive))){
@@ -414,7 +414,7 @@ async function gdriveFusionar(){
         'ingredientes','recetas','producciones','ventas','pedidos',
         'historialCompras','proveedores','stockProductos',
         'lotesIngredientes','catRecetas','gastosFijos','extracciones',
-        'prestamos','metas','capital_ajustes'
+        'prestamos','metas','capital_ajustes','mermas'
       ];
 
       const merged = Object.assign({}, local);

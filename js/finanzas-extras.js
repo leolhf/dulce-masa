@@ -124,7 +124,7 @@ function _renderComparativaMes() {
   const updEl = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
 
   updEl('resumen-ingresos-det',   `${mAct.nVentas} ventas ${_badge(_diff(mAct.ingresosTotal, mAnt.ingresosTotal))}`);
-  updEl('resumen-gastos-det',     `${fmt(mAct.costoCompras)} compras + ${fmt(mAct.costosVariables + mAct.gastosFijosMes)} op. ${_badge(_diff(mAct.gastosTotales, mAnt.gastosTotales), true)}`);
+  updEl('resumen-gastos-det',     `${fmt(mAct.costosVariables)} ingredientes + ${fmt(mAct.gastosFijosMes)} fijos · compras: ${fmt(mAct.costoCompras)} ${_badge(_diff(mAct.gastosTotales, mAnt.gastosTotales), true)}`);
   updEl('resumen-disponible-det', `Para retiros ${_badge(_diff(mAct.disponible, mAnt.disponible))}`);
   updEl('resumen-capital-total-det', `Efectivo + Préstamos ${_badge(_diff(mAct.capitalTotal, mAnt.capitalTotal))}`);
 }

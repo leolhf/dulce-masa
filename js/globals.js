@@ -6,6 +6,7 @@ let ingredientes, recetas, producciones, ventas, pedidos, stockProductos, provee
 let catRecetas = ['Tortas','Cupcakes','Galletas','Facturas','Panes','Alfajores','Otros'];
 let gastosFijos = [];    // {id, nombre, monto, periodo:'mensual'|'semanal'|'anual'}
 let extracciones = [];   // {id, fecha, monto, tipo, concepto, periodo}
+let mermas = [];         // {id, fecha, recetaId, cantidad, motivo, nota}
 let prestamos;           // {id, fecha, prestamista, monto, concepto, devolver:bool, pctPorProduccion, pagos:[...]}
 let capital_ajustes = []; // Ajustes manuales de capital
 let metas = [];          // {id, nombre, tipo, objetivo, fechaLimite, nota, valorActual}

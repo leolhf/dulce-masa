@@ -86,20 +86,23 @@ function showCostoDetalle(rId){
 
     <!-- Desglose de ingredientes -->
     ${(() => {
-  // Obtener desglose FIFO si está disponible
+  // Obtener desglose FIFO con fallback (usa último precio si no hay stock)
   let detalleFIFO = null;
-  if(typeof estimarCostoFIFO === 'function' && lotesIngredientes && lotesIngredientes.length > 0){
-    try { detalleFIFO = estimarCostoFIFO(r, 1).detalleConsumo; } catch(e){}
+  if(typeof estimarCostoFIFOConFallback === 'function' && lotesIngredientes && lotesIngredientes.length > 0){
+    try { detalleFIFO = estimarCostoFIFOConFallback(r, 1).detalleConsumo; } catch(e){}
   }
   return r.ings.map(ri=>{
     const i=ing(ri.ingId); if(!i) return '';
-    // Usar costo FIFO real si está disponible, sino precio fijo
     const fifoIng = detalleFIFO ? detalleFIFO.find(d=>d.ingredienteId===ri.ingId) : null;
     const sub = fifoIng ? fifoIng.costoTotal : ri.qty * (i.precio||0);
     const precioU = ri.qty > 0 ? sub / ri.qty : 0;
     const pct = costoIng>0 ? Math.round(sub/costoIng*100) : 0;
+    // Detectar si algún lote consumido es precio estimado (sin stock real)
+    const tieneEstimado = fifoIng && (fifoIng.lotesConsumidos||[]).some(lc=>lc.esPrecioEstimado);
     const fifoTag = fifoIng
-      ? `<span style="font-size:.68rem;color:var(--sage);margin-left:4px">FIFO ${fmt(precioU)}/${i.unidad}</span>` 
+      ? tieneEstimado
+        ? `<span style="font-size:.68rem;color:var(--warn);margin-left:4px" title="Sin stock: usando último precio FIFO conocido">⚠ ref. ${fmt(precioU)}/${i.unidad}</span>`
+        : `<span style="font-size:.68rem;color:var(--sage);margin-left:4px">FIFO ${fmt(precioU)}/${i.unidad}</span>`
       : `<span style="font-size:.68rem;color:var(--text3);margin-left:4px">precio fijo</span>`;
     return`<div class="costo-row">
       <span>${i.nombre} <span style="color:var(--text3);font-size:.76rem">${fmtN(ri.qty,3)} ${i.unidad}</span>${fifoTag}</span>

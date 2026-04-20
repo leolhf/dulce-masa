@@ -19,7 +19,7 @@ function formatCantidad(stock, unidad){
 async function initializeData(){
   const DEF={
     ingredientes:[],recetas:[],producciones:[],ventas:[],pedidos:[],lotesIngredientes:[],
-    stockProductos:[],proveedores:[],historialCompras:[],extracciones:[],
+    stockProductos:[],proveedores:[],historialCompras:[],extracciones:[],mermas:[],
     capital_ajustes: [],  // Agregar ajustes de capital
     nextId:{ing:1,rec:1,prod:1,venta:1,prov:1,comp:1,pedido:1,ext:1,lote:1}
   };
@@ -82,6 +82,7 @@ async function initializeData(){
       if(saved.catRecetas&&Array.isArray(saved.catRecetas)&&saved.catRecetas.length>0) catRecetas=saved.catRecetas;
       if(saved.gastosFijos&&Array.isArray(saved.gastosFijos))   gastosFijos=saved.gastosFijos;
       if(saved.extracciones&&Array.isArray(saved.extracciones)) extracciones=saved.extracciones;
+      if(saved.mermas&&Array.isArray(saved.mermas)) mermas=saved.mermas;
       if(saved.prestamos&&Array.isArray(saved.prestamos))       prestamos=saved.prestamos;
       if(saved.metas&&Array.isArray(saved.metas))                   metas=saved.metas;
     } else {
@@ -112,6 +113,7 @@ async function initializeData(){
   nextId.ext    = nextId.ext    ||1;
   nextId.prestamo=nextId.prestamo||1;
   nextId.lote   = nextId.lote   ||1;
+  nextId.merma  = nextId.merma  ||1;
 
   // ── Sanear ids inválidos en historialCompras ──
   let _maxCompId=0, _idsSaneados=0;
@@ -227,15 +229,18 @@ function stockLabel(i){
   return'OK';
 }
 function calcCosto(r, tandas=1){
-  // Intentar calcular por FIFO real usando lotes disponibles
-  if(typeof estimarCostoFIFO === 'function' && lotesIngredientes && lotesIngredientes.length > 0){
+  // Usar estimarCostoFIFOConFallback: calcula por lotes FIFO reales y,
+  // si algún ingrediente no tiene stock suficiente, usa el último precio
+  // FIFO conocido de ese ingrediente en lugar de devolver $0.
+  if(typeof estimarCostoFIFOConFallback === 'function' && lotesIngredientes && lotesIngredientes.length > 0){
     try {
-      return estimarCostoFIFO(r, tandas).costoTotal;
+      return estimarCostoFIFOConFallback(r, tandas).costoTotal;
     } catch(e) {
-      // Sin stock suficiente en lotes - caer al precio fijo como respaldo
+      // Error inesperado → continuar con respaldo
     }
   }
-  // Respaldo: precio fijo del inventario
+  // Respaldo final: precio guardado en el ingrediente
+  // (que ya preserva el último precio FIFO gracias a sincronizarStockConLotes)
   return r.ings.reduce((a, ri) => {
     const i = ing(ri.ingId);
     if(!i) return a;

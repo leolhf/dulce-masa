@@ -81,7 +81,15 @@ function _finMetricas(periodo){
   }, 0);
 
   const costoCompras  = comprasPer.reduce((a,c) => a + c.qty * c.precio, 0);
-  const gastosTotales = costosVariables + gastosFijosMes + costoCompras;
+
+  // Pérdida por mermas del período
+  const mermasPer = enRango(mermas || []);
+  const perdidaMermas = mermasPer.reduce((a, m) => {
+    const r = rec(m.recetaId);
+    return a + (r ? calcCosto(r, m.cantidad / (r.rinde || 1)) : 0);
+  }, 0);
+
+  const gastosTotales = costosVariables + gastosFijosMes;
   const flujoBruto    = ingresosTotal - gastosTotales;
   const reservaOp     = Math.max(0, flujoBruto * 0.20);
   const disponible    = Math.max(0, flujoBruto - reservaOp);
@@ -105,6 +113,15 @@ function _finMetricas(periodo){
   // Los préstamos con devolución ya están siendo devueltos (saldados), por lo que no se suman al capital total
   const capitalTotal      = efectivoOperativo + prestamosSinDevolucion;
 
+  // Desglose por medio de pago
+  const ventasCobradas = ventasPer.filter(v => v.cobrado !== false);
+  const megmaBreakdown = {};
+  ventasCobradas.forEach(v => {
+    const k = v.megma || '';
+    if (!megmaBreakdown[k]) megmaBreakdown[k] = 0;
+    megmaBreakdown[k] += v.unidades * v.precio + (v.propina || 0);
+  });
+
   return {
     ingresosBrutos, totalPropinas, ingresosTotal,
     costosVariables, gastosFijosMes, costoCompras,
@@ -114,7 +131,9 @@ function _finMetricas(periodo){
     capitalPrestamos, deudaPrestamos,
     prestamosConDevolucion, prestamosSinDevolucion,
     efectivoOperativo, capitalTotal,
-    nVentas: ventasPer.length
+    nVentas: ventasPer.length,
+    megmaBreakdown,
+    perdidaMermas
   };
 }
 
@@ -208,7 +227,7 @@ function renderFinanzas(){
   updateElement('resumen-ingresos', fmt(m.ingresosTotal));
   updateElement('resumen-ingresos-det', `${m.nVentas || 0} ventas`);
   updateElement('resumen-gastos', fmt(m.gastosTotales));
-  updateElement('resumen-gastos-det', `${fmt(m.costosVariables)} ingredientes + ${fmt(m.gastosFijosMes)} fijos + ${fmt(m.costoCompras)} compras`);
+  updateElement('resumen-gastos-det', `${fmt(m.costosVariables)} ingredientes + ${fmt(m.gastosFijosMes)} fijos · compras: ${fmt(m.costoCompras)}`);
   updateElement('resumen-flujo', fmt(m.flujoBruto));
   updateElement('resumen-disponible', fmt(m.disponible));
   updateElement('resumen-disponible-det', `Para retiros`);
@@ -336,7 +355,8 @@ function _renderRetiroSugerido(m){
     ${alertaMsg}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
       ${_finFila('💰 Ingresos totales', m.ingresosTotal, 'ok')}
-      ${_finFila('− Costos de ingredientes', -m.costosVariables, 'danger', true)}
+      ${_finFila('− Costo ingredientes vendidos', -m.costosVariables, 'danger', true)}
+      ${m.perdidaMermas > 0 ? _finFila('− Pérdida por mermas', -m.perdidaMermas, 'danger', true) : ''}
       ${_finFila('− Gastos fijos del negocio', -m.gastosFijosMes, 'danger', true)}
       <div style="height:1px;background:var(--border);margin:4px 0"></div>
       ${_finFila('= Flujo neto', m.flujoBruto, m.flujoBruto >= 0 ? 'ok' : 'danger')}
@@ -344,6 +364,38 @@ function _renderRetiroSugerido(m){
       <div style="height:1px;background:var(--border);margin:4px 0"></div>
       ${_finFila('= Disponible para retirar', m.disponible, 'ok')}
     </div>
+    ${m.costoCompras > 0 ? `
+    <div style="background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:14px;font-size:.81rem">
+      <span style="color:var(--text3)">🛒 Inversión en stock este período:</span>
+      <strong style="color:var(--caramel);margin-left:6px">${fmt(m.costoCompras)}</strong>
+      <span style="font-size:.73rem;color:var(--text3);display:block;margin-top:3px">Las compras no son gasto del período — se contabilizan cuando el ingrediente se usa en ventas.</span>
+    </div>` : ''}
+
+    ${(()=>{
+      const bd = m.megmaBreakdown || {};
+      const keys = Object.keys(bd).filter(k=>bd[k]>0);
+      if(!keys.length) return '';
+      const megmaL = {efectivo:'💵 Efectivo',transferencia:'🏦 Transferencia',tarjeta:'💳 Tarjeta',yape:'📱 Yape/Plin',qr:'🔲 QR',otro:'Otro','':`Sin especificar`};
+      const megmaC = {efectivo:'var(--sage)',transferencia:'#5B7FA6',tarjeta:'#9B6BB5',yape:'#E67E4D',qr:'var(--caramel)',otro:'var(--text3)','':`var(--text3)`};
+      const total = keys.reduce((a,k)=>a+bd[k],0);
+      const filas = keys.sort((a,b)=>bd[b]-bd[a]).map(k=>{
+        const pct = total>0?Math.round(bd[k]/total*100):0;
+        const color = megmaC[k]||'var(--text3)';
+        const label = megmaL[k]||k||'Sin especificar';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="min-width:110px;font-size:.8rem;color:var(--text2)">${label}</span>
+          <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
+          </div>
+          <span style="font-size:.78rem;font-weight:600;color:var(--text1);min-width:60px;text-align:right">${fmt(bd[k])}</span>
+          <span style="font-size:.72rem;color:var(--text3);min-width:28px;text-align:right">${pct}%</span>
+        </div>`;
+      }).join('');
+      return `<div style="background:var(--cream2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;margin-bottom:14px">
+        <div style="font-size:.72rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">💳 Ingresos por medio de pago</div>
+        ${filas}
+      </div>`;
+    })()}
 
     <div style="background:var(--ok-bg);border:1px solid #BCCFBC;border-radius:var(--r);padding:13px 15px;margin-bottom:14px">
       <div style="font-size:.72rem;font-weight:600;color:var(--ok);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Retiro sugerido (máx. 70%)</div>

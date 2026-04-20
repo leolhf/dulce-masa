@@ -99,12 +99,21 @@ function renderInventario() {
 
 // ── Obtener precio según tipo seleccionado ──
 function obtenerPrecioSegunTipo(ingId) {
-  if (typeof obtenerPrecioPromedioIngrediente === 'function') {
-    return obtenerPrecioPromedioIngrediente(ingId);
-  }
-  // Fallback a precio fijo si la función no está disponible
   const ingrediente = ingredientes.find(i => i.id == ingId);
-  return ingrediente && ingrediente.precio > 0 ? ingrediente.precio : 0;
+  if (!ingrediente) return 0;
+
+  // 1. Precio guardado en el ingrediente (ya preserva el último precio FIFO
+  //    gracias a sincronizarStockConLotes cuando no hay stock disponible)
+  if (ingrediente.precio > 0) return ingrediente.precio;
+
+  // 2. Último lote registrado (aunque esté agotado) — evita mostrar $0
+  //    en ingredientes recién vaciados que aún no pasaron por sync
+  if (typeof obtenerUltimoPrecioFIFO === 'function') {
+    const ultimoPrecio = obtenerUltimoPrecioFIFO(ingId);
+    if (ultimoPrecio !== null && ultimoPrecio > 0) return ultimoPrecio;
+  }
+
+  return 0;
 }
 
 // ── Edición inline de Stock y Precio ──
@@ -150,6 +159,16 @@ function inlineEdit(ingId, campo, td) {
         i.stock = +nuevo.toFixed(4);
       }
     } else {
+      // Si el usuario ingresa 0 pero el ingrediente tiene historial de lotes,
+      // advertir y conservar el último precio FIFO para no romper el cálculo de recetas
+      if (nuevo === 0 && typeof obtenerUltimoPrecioFIFO === 'function') {
+        const ultimoFIFO = obtenerUltimoPrecioFIFO(i.id);
+        if (ultimoFIFO !== null && ultimoFIFO > 0) {
+          toast(`⚠ Precio 0 ignorado — se mantiene último precio FIFO: $${ultimoFIFO.toFixed(2)}`);
+          td.innerHTML = htmlOriginal;
+          return;
+        }
+      }
       i.precio = +nuevo.toFixed(2);
     }
     saveData();
@@ -259,6 +278,17 @@ function guardarIng(){
   if(!nombre){toast('Ingresá un nombre');return;}
   const nuevoPrecio = parseFloat($('ing-precio').value)||0;
   if(nuevoPrecio < 0){toast('El precio no puede ser negativo');return;}
+
+  // Si el usuario pone precio 0 en un ingrediente que ya tiene historial de lotes FIFO,
+  // usar el último precio FIFO para no perder la referencia de costo en las recetas
+  let precioFinal = nuevoPrecio;
+  if(nuevoPrecio === 0 && editIngId && typeof obtenerUltimoPrecioFIFO === 'function'){
+    const ultimoFIFO = obtenerUltimoPrecioFIFO(editIngId);
+    if(ultimoFIFO !== null && ultimoFIFO > 0){
+      precioFinal = ultimoFIFO;
+      toast(`⚠ Precio 0 → se conserva último precio FIFO: $${ultimoFIFO.toFixed(2)}`);
+    }
+  }
   const stockVal = parseFloat($('ing-stock').value)||0;
   if(stockVal < 0){toast('El stock inicial no puede ser negativo');return;}
   const minVal = parseFloat($('ing-min').value)||0;
@@ -283,7 +313,7 @@ function guardarIng(){
     stock:stockVal,
     min:minVal,
     unidad:$('ing-unidad').value,
-    precio:nuevoPrecio
+    precio:precioFinal
   };
   const _esNuevoIng = !editIngId;
   const _valoresAntIng = editIngId ? {...ing(editIngId)} : null;
@@ -298,8 +328,8 @@ function guardarIng(){
   editIngId=null;closeModal('modal-ing');renderInventario();saveData();toast('Ingrediente guardado ✓');
 
   // Alerta si cambió el precio y hay recetas afectadas
-  if(precioAnterior !== null && precioAnterior !== nuevoPrecio){
-    _alertaPrecioCambiado(data.id, data.nombre, precioAnterior, nuevoPrecio);
+  if(precioAnterior !== null && precioAnterior !== precioFinal){
+    _alertaPrecioCambiado(data.id, data.nombre, precioAnterior, precioFinal);
   }
 }
 function delIng(id){
