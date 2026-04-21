@@ -81,6 +81,7 @@ function _cargarDatosJSON(text){
   if(data.extracciones && Array.isArray(data.extracciones)) extracciones=data.extracciones;
   if(data.prestamos && Array.isArray(data.prestamos)) prestamos=data.prestamos;
   if(data.metas && Array.isArray(data.metas)) metas=data.metas;
+  if(data.mermas && Array.isArray(data.mermas)) mermas=data.mermas;
   if (data.capital_ajustes && Array.isArray(data.capital_ajustes)) {
     CapitalAdjustment.ajustes = data.capital_ajustes;
   }
@@ -91,7 +92,7 @@ function _cargarDatosJSON(text){
   nextId.venta=nextId.venta||1; nextId.comp=nextId.comp||nextId.compra||1;
   nextId.prov=nextId.prov||1; nextId.pedido=nextId.pedido||1;
   nextId.ext=nextId.ext||1; nextId.prestamo=nextId.prestamo||1;
-  nextId.lote=nextId.lote||1;
+  nextId.lote=nextId.lote||1; nextId.merma=nextId.merma||1;
 
   // Sanear ids inválidos en historialCompras
   let _maxC=0;

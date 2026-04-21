@@ -159,10 +159,16 @@ function recalcStockProducto(recetaId){
     .reduce((a, p) => {
       return a + p.items.filter(it => it.recetaId === recetaId).reduce((b, it) => b + it.cantidad, 0);
     }, 0);
+  // AGREGAR ESTO:
+  const totalMermas = (mermas||[])
+    .filter(m => m.recetaId === recetaId)
+    .reduce((a, m) => a + (m.cantidad || 0), 0);
+
   let sp = stockProd(recetaId);
   if (!sp) { sp = {recetaId, stock: 0, total: 0}; stockProductos.push(sp); }
   sp.total = Math.max(0, totalProducido);
-  sp.stock = Math.max(0, totalProducido - totalVendido - totalPedidosListo);
+  // CAMBIAR ESTO:
+  sp.stock = Math.max(0, totalProducido - totalVendido - totalPedidosListo - totalMermas);
 }
 
 function refreshAllStockViews(){
