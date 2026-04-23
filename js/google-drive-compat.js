@@ -17,6 +17,9 @@ function convertEventsToLegacyData(events) {
     lotesIngredientes: [],
     catRecetas: ['Tortas','Cupcakes','Galletas','Facturas','Panes','Alfajores','Otros'],
     gastosFijos: [],
+    prestamos: [],
+    metas: [],
+    capital_ajustes: [],
     nextId: {
       ing: 1, rec: 1, prod: 1, venta: 1, comp: 1,
       prov: 1, pedido: 1, ext: 1, prestamo: 1, lote: 1, merma: 1
@@ -61,7 +64,7 @@ function convertEventsToLegacyData(events) {
         break;
         
       case 'add_pedido':
-        if (!legacyData.pedidos.find(p => p.id === p.id)) {
+        if (!legacyData.pedidos.find(existing => existing.id === p.id)) {
           legacyData.pedidos.push({
             ...p,
             notas: '',
@@ -82,7 +85,7 @@ function convertEventsToLegacyData(events) {
         break;
         
       case 'add_produccion':
-        if (!legacyData.producciones.find(p => p.id === p.id)) {
+        if (!legacyData.producciones.find(existing => existing.id === p.id)) {
           legacyData.producciones.push({
             ...p,
             nota: ''
@@ -109,7 +112,7 @@ function convertEventsToLegacyData(events) {
         break;
         
       case 'add_proveedor':
-        if (!legacyData.proveedores.find(p => p.id === p.id)) {
+        if (!legacyData.proveedores.find(existing => existing.id === p.id)) {
           legacyData.proveedores.push({
             ...p,
             productos: '',
@@ -143,52 +146,3 @@ function convertEventsToLegacyData(events) {
   return legacyData;
 }
 
-// Modificar la función gdriveLoad existente para usar la compatibilidad
-if (typeof gdriveLoad === 'function') {
-  const originalGdriveLoad = gdriveLoad;
-  
-  gdriveLoad = async function() {
-    const url = _gasGetUrl();
-    if(!url) return;
-    try{
-      _gdriveActualizarUI(true, 'Cargando...');
-      const resp = await fetch(url + '?action=load', {method:'GET'});
-      if(!resp.ok) throw new Error('HTTP '+resp.status);
-      const result = await resp.json();
-      if(result.status === 'empty'){
-        _gdriveActualizarUI(true);
-        toast(' No hay datos en Drive aún. Guardá primero.');
-        return;
-      }
-      if(result.status !== 'ok') throw new Error(result.message || 'Error en el script');
-      
-      let driveData = JSON.parse(result.data);
-      
-      // Verificar si está en formato de eventos (nuevo sistema móvil)
-      if (Array.isArray(driveData.events)) {
-        // Convertir eventos a formato tradicional para compatibilidad
-        driveData = convertEventsToLegacyData(driveData.events);
-        toast(' Detectados datos de móvil v2 - Convertidos automáticamente');
-      }
-      
-      // Comparar con datos locales
-      const localData = buildData();
-      const diff = _gdriveDiff(localData, driveData);
-      _gdriveActualizarUI(true);
-
-      if(!diff.hasDiff){
-        toast(' Los datos de Drive son idénticos a los locales.');
-        return;
-      }
-
-      // Hay diferencias mostrar modal
-      _gdrivePendingData = driveData;
-      _gdriveMostrarConflicto(diff);
-
-    }catch(e){
-      console.error('gdriveLoad error:', e);
-      _gdriveActualizarUI(true, ' Error al cargar');
-      toast(' Error cargando de Drive: '+e.message);
-    }
-  };
-}

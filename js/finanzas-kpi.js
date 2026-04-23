@@ -89,7 +89,7 @@ function _finMetricas(periodo){
     return a + (r ? calcCosto(r, m.cantidad / (r.rinde || 1)) : 0);
   }, 0);
 
-  const gastosTotales = costosVariables + gastosFijosMes;
+  const gastosTotales = costoCompras + gastosFijosMes;
   const flujoBruto    = ingresosTotal - gastosTotales;
   const reservaOp     = Math.max(0, flujoBruto * 0.20);
   const disponible    = Math.max(0, flujoBruto - reservaOp);
@@ -227,7 +227,7 @@ function renderFinanzas(){
   updateElement('resumen-ingresos', fmt(m.ingresosTotal));
   updateElement('resumen-ingresos-det', `${m.nVentas || 0} ventas`);
   updateElement('resumen-gastos', fmt(m.gastosTotales));
-  updateElement('resumen-gastos-det', `${fmt(m.costosVariables)} ingredientes + ${fmt(m.gastosFijosMes)} fijos · compras: ${fmt(m.costoCompras)}`);
+  updateElement('resumen-gastos-det', `${fmt(m.costoCompras)} compras + ${fmt(m.gastosFijosMes)} fijos`);
   updateElement('resumen-flujo', fmt(m.flujoBruto));
   updateElement('resumen-disponible', fmt(m.disponible));
   updateElement('resumen-disponible-det', `Para retiros`);

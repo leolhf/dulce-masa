@@ -939,7 +939,7 @@ async function registrarVentaM(){
   // Guardar estado anterior para deshacer
   _pushHistorial('venta_nueva',{ recetaId, unidades, precio });
 
-  const venta={ id:_nextId('ventas'), fecha:today(), recetaId, unidades, precio, propina:0, canal, nota, cobrado:true };
+  const venta={ id:_nextId('ventas'), fecha:today(), recetaId, unidades, precio, propina:0, canal, megma:'', nota, cobrado:true };
   if(!_data.ventas) _data.ventas=[];
   _data.ventas.push(venta);
 
@@ -1121,7 +1121,8 @@ async function registrarPedidoM(){
   if(!_npItems.length){ toast('⚠ Agregá al menos un producto'); return; }
 
   const pedido={
-    id:_nextId('pedidos'), fecha:today(), cliente, fechaEntrega:fecha||null,
+    id:_nextId('pedidos'), fecha:today(), cliente, telefono:'', email:'',
+    fechaEntrega:fecha||null,
     anticipo, notas, estado:'pendiente', ventaIds:[],
     items:_npItems.map(it=>({recetaId:it.recetaId,cantidad:it.cantidad,precio:it.precio}))
   };
@@ -1211,7 +1212,7 @@ async function accionPedidoM(id,nuevoEstado){
     (p.items||[]).forEach(item=>{
       const vid=_nextId('ventas');
       p.ventaIds.push(vid);
-      _data.ventas.push({id:vid,fecha:today(),recetaId:item.recetaId,unidades:item.cantidad,precio:item.precio,propina:0,canal:'encargo',cobrado:false,nota:`Pedido #${p.id}: ${p.cliente}`});
+      _data.ventas.push({id:vid,fecha:today(),recetaId:item.recetaId,unidades:item.cantidad,precio:item.precio,propina:0,canal:'encargo',megma:'',cobrado:false,nota:`Pedido #${p.id}: ${p.cliente}`});
     });
     p.estado='entregado_sin_cobrar';
     p.fechaEntregaReal=today();
@@ -1231,7 +1232,7 @@ async function accionPedidoM(id,nuevoEstado){
       (p.items||[]).forEach(item=>{
         const vid=_nextId('ventas');
         p.ventaIds.push(vid);
-        _data.ventas.push({id:vid,fecha:today(),recetaId:item.recetaId,unidades:item.cantidad,precio:item.precio,propina:0,canal:'encargo',cobrado:true,nota:`Pedido #${p.id}: ${p.cliente}`});
+        _data.ventas.push({id:vid,fecha:today(),recetaId:item.recetaId,unidades:item.cantidad,precio:item.precio,propina:0,canal:'encargo',megma:'',cobrado:true,nota:`Pedido #${p.id}: ${p.cliente}`});
         let sp=_sprod(item.recetaId);
         if(sp) sp.stock=_calcStockProducto(item.recetaId);
       });
@@ -1367,7 +1368,7 @@ async function registrarCompraM(){
     const min   =parseFloat(document.getElementById('c-ing-min')?.value)||0;
     ingId=_nextId('ingredientes');
     if(!_data.ingredientes) _data.ingredientes=[];
-    _data.ingredientes.push({id:ingId,nombre:ingNombre,unidad,stock:0,min,precio:precio||0});
+    _data.ingredientes.push({id:ingId,nombre:ingNombre,cat:'',unidad,stock:0,min,precio:precio||0});
     toast(`&#x2728; Ingrediente "${ingNombre}" creado`);
   }
   if(!ingId){ toast('⚠ Seleccioná o creá un ingrediente'); return; }
@@ -1377,11 +1378,26 @@ async function registrarCompraM(){
   if(!provId&&provNombre){
     provId=_nextId('proveedores');
     if(!_data.proveedores) _data.proveedores=[];
-    _data.proveedores.push({id:provId,nombre:provNombre,contacto:'',notas:''});
+    _data.proveedores.push({id:provId,nombre:provNombre,contacto:'',tel:'',email:'',productos:'',dir:'',notas:''});
     toast(`&#x2728; Proveedor "${provNombre}" creado`);
   }
 
-  const compra={id:_nextId('historialCompras'),ingId,qty,precio:precio||0,fecha:today(),provId:provId||null,notas};
+  const iObj2=_ing(ingId);
+  const compra={
+    id:_nextId('historialCompras'),
+    ingId,
+    ingNombre: iObj2?.nombre||ingNombre,
+    ingUnidad: iObj2?.unidad||unidad,
+    qty,
+    precio: precio||0,
+    total: +((qty)*(precio||0)).toFixed(2),
+    fecha: today(),
+    provId: provId||null,
+    provNombre: provId ? (_prov(provId)?.nombre||provNombre||'') : '',
+    notas,
+    timestamp: Date.now(),
+    loteId: null
+  };
   _pushHistorial('compra_nueva',{id:compra.id,ingId,qty,precio});
 
   if(!_data.historialCompras) _data.historialCompras=[];
@@ -1396,7 +1412,8 @@ async function registrarCompraM(){
   // Crear lote FIFO si existe el array
   if(_data.lotesIngredientes){
     const loteId=_nextId('lotesIngredientes');
-    _data.lotesIngredientes.push({id:loteId,ingredienteId:ingId,cantidad:qty,cantidadRestante:qty,costoUnitario:precio||0,fechaIngreso:today(),proveedorId:provId||null,compraId:compra.id,nota:notas||''});
+    _data.lotesIngredientes.push({id:loteId,ingredienteId:ingId,cantidad:qty,cantidadRestante:qty,costoUnitario:precio||0,fechaIngreso:today(),proveedorId:provId||null,compraId:compra.id,numeroFactura:null,nota:notas||''});
+    compra.loteId = loteId;
   }
 
   _data._guardado=nowISOLocal();

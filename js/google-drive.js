@@ -110,7 +110,7 @@ async function gdriveLoad(){
     const result = await resp.json();
     if(result.status === 'empty'){
       _gdriveActualizarUI(true);
-      toast(' No hay datos en Drive aún. Guardá primero.');
+      toast('☁ No hay datos en Drive aún. Guardá primero.');
       return;
     }
     if(result.status !== 'ok') throw new Error(result.message || 'Error en el script');
@@ -301,6 +301,12 @@ function _gdriveMostrarDetalle(key){
       case 'historialCompras': return `ID ${r.id} · ${r.fecha||'?'} · Ing: ${r.ingId} · ${r.qty??'?'} u · $${r.precio??'?'}`;
       case 'proveedores':    return `<strong>${escapeHTML(r.nombre||'?')}</strong> · Tel: ${escapeHTML(r.tel||'—')} · ${escapeHTML(r.productos||'—')}`;
       case 'stockProductos': return `Receta: ${r.recetaId} · Stock: ${r.stock??'?'} · Total: ${r.total??'?'}`;
+      case 'lotesIngredientes': return `Lote ${r.id} · Ing: ${r.ingId} · Qty: ${r.qty??'?'} · Costo: $${r.costo??'?'} · ${r.fecha||'?'}`;
+      case 'gastosFijos':  return `<strong>${escapeHTML(r.nombre||'?')}</strong> · $${r.monto??'?'} · ${escapeHTML(r.frecuencia||'?')}`;
+      case 'extracciones': return `ID ${r.id} · ${r.fecha||'?'} · $${r.monto??'?'} · ${escapeHTML(r.concepto||'—')}`;
+      case 'prestamos':    return `ID ${r.id} · ${escapeHTML(r.persona||'?')} · $${r.monto??'?'} · ${escapeHTML(r.estado||'?')}`;
+      case 'metas':        return `<strong>${escapeHTML(r.nombre||'?')}</strong> · Meta: $${r.objetivo??'?'} · Actual: $${r.actual??'?'}`;
+      case 'capital_ajustes': return `ID ${r.id} · ${r.fecha||'?'} · $${r.monto??'?'} · ${escapeHTML(r.concepto||'—')}`;
       default: return JSON.stringify(r).slice(0,80);
     }
   }
@@ -315,11 +321,11 @@ function _gdriveMostrarDetalle(key){
         <span style="color:var(--text3);font-size:.72rem;padding-top:2px">${k}</span>
         <div style="background:rgba(184,84,80,.08);border-radius:5px;padding:3px 7px;color:var(--danger);word-break:break-all">
           <div style="font-size:.62rem;color:var(--text3);margin-bottom:1px">📱 Local</div>
-          ${JSON.stringify(l[k])??'—'}
+          ${l[k] !== undefined ? JSON.stringify(l[k]) : '—'}
         </div>
         <div style="background:rgba(66,133,244,.08);border-radius:5px;padding:3px 7px;color:#2a5db0;word-break:break-all">
           <div style="font-size:.62rem;color:var(--text3);margin-bottom:1px">☁ Drive</div>
-          ${JSON.stringify(d[k])??'—'}
+          ${d[k] !== undefined ? JSON.stringify(d[k]) : '—'}
         </div>
       </div>`).join('');
   }
@@ -494,7 +500,7 @@ function _gdriveActualizarUI(conectado, msg){
   const dot    = $('gdrive-dot');
   const texto  = $('gdrive-texto');
   const nombre = $('gdrive-archivo-nombre');
-  const syncStatus = $('gdrive-sync-status');
+  const syncStatusEl = $('gdrive-sync-status');
   const btnLogin  = $('btn-gdrive-login');
   const btnLogout = $('btn-gdrive-logout');
   const acciones  = $('sf-drive-acciones');
@@ -512,18 +518,17 @@ function _gdriveActualizarUI(conectado, msg){
     nombre.textContent   = msg ? '☁ ' + msg : '☁ Listo';
     
     // Mostrar estado de sincronización
-    const syncStatus = document.getElementById('sync-status');
-    if(syncStatus){
-      syncStatus.style.display = 'block';
+    if(syncStatusEl){
+      syncStatusEl.style.display = 'block';
       if(_syncStatus === 'synced'){
-        syncStatus.style.color = 'var(--sage)';
-        syncStatus.textContent = '✅ Sincronizado - Auto-sync activado (4s)';
+        syncStatusEl.style.color = 'var(--sage)';
+        syncStatusEl.textContent = '✅ Sincronizado - Auto-sync activado (4s)';
       } else if(_syncStatus === 'conflict'){
-        syncStatus.style.color = 'var(--warn)';
-        syncStatus.textContent = '⚠ Conflicto - Solo guardado manual';
+        syncStatusEl.style.color = 'var(--warn)';
+        syncStatusEl.textContent = '⚠ Conflicto - Solo guardado manual';
       } else {
-        syncStatus.style.color = 'var(--text3)';
-        syncStatus.textContent = '❓ Verificando estado...';
+        syncStatusEl.style.color = 'var(--text3)';
+        syncStatusEl.textContent = '❓ Verificando estado...';
       }
     }
   } else {
@@ -535,7 +540,7 @@ function _gdriveActualizarUI(conectado, msg){
     btnLogout.style.display = 'none';
     if(acciones) acciones.style.display = 'none';
     nombre.style.display = 'none';
-    if(syncStatus) syncStatus.style.display = 'none';
+    if(syncStatusEl) syncStatusEl.style.display = 'none';
   }
 }
 
@@ -580,6 +585,7 @@ async function _gdriveCompararAlArrancar(){
 
 // Timer para el guardado en Drive 4 segundos después del último cambio local
 let _driveAutoSyncTimer = null;
+let _driveAutoSyncActivo = false;
 
 // Función para programar guardado en Drive
 function _programarDriveSync(){
