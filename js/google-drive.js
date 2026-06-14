@@ -179,7 +179,7 @@ function _gdriveDiff(local, drive){
 
   if(!hasDiff){
     // Comparar solo las secciones de datos reales (excluir nextId y metadatos)
-    // para evitar falsos conflictos cuando movil.html no actualiza nextId
+    // para evitar falsos conflictos por diferencias en nextId o metadatos
     const DATA_KEYS = [
       'ingredientes','recetas','producciones','ventas','pedidos',
       'historialCompras','proveedores','stockProductos',

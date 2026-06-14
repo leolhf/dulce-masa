@@ -16,17 +16,6 @@
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script>
-  // En teléfonos, abrir directamente la interfaz optimizada para campo.
-  (function () {
-    const params = new URLSearchParams(window.location.search);
-    const forceDesktop = params.get('desktop') === '1' || localStorage.getItem('dm_force_desktop') === '1';
-    const isMobileLike = window.matchMedia('(max-width: 900px)').matches && navigator.maxTouchPoints > 0;
-    if (!forceDesktop && isMobileLike && !window.location.pathname.endsWith('/movil.html')) {
-      window.location.replace('movil.html' + window.location.search + window.location.hash);
-    }
-  })();
-</script>
 </head>
 <body>
 
@@ -151,7 +140,7 @@
     </div>
     <button id="btn-deshacer" onclick="deshacerUltimaAccion()" style="display:flex;align-items:center;gap:5px;background:rgba(212,108,108,.15);color:var(--danger);border:1px solid rgba(212,108,108,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:not-allowed;font-family:'DM Sans',sans-serif;font-weight:500;opacity:0.5" disabled title="Deshacer última acción">↶ Deshacer</button>
     <div class="topbar-right" id="topbar-right">
-      <button id="btn-mobile-mode" onclick="window.location.href='movil.html'" style="display:none;align-items:center;gap:5px;background:rgba(107,175,105,.12);color:var(--ok);border:1px solid rgba(107,175,105,.35);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">📱 Modo móvil</button>
+
       <button id="btn-pwa-install" onclick="pwaInstall()" style="display:none;align-items:center;gap:5px;background:rgba(196,124,43,.15);color:var(--caramel);border:1px solid rgba(196,124,43,.4);font-size:.78rem;padding:6px 12px;border-radius:var(--r);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500">⬇ Instalar app</button>
     </div>
   </div>
